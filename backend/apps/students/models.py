@@ -47,6 +47,13 @@ class Student(models.Model):
         related_name='students',
         help_text="Current class and section of the student",
     )
+    parents = models.ManyToManyField(
+        'accounts.User',
+        related_name='children',
+        blank=True,
+        limit_choices_to={'role': 'PARENT'},
+        help_text="Parents or guardians linked to this student",
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

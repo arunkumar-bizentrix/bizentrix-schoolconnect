@@ -22,3 +22,4 @@ class StudentAdmin(admin.ModelAdmin):
     )
     list_filter = ('school', 'class_enrolled', 'is_active')
     search_fields = ('admission_number', 'first_name', 'last_name', 'school__name')
+    filter_horizontal = ('parents',)
