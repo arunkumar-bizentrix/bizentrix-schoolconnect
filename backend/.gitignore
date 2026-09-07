@@ -1,0 +1,24 @@
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment secrets
+.env
+.env.local
+*.local
+
+# Django media and static
+media/
+staticfiles/
+*.sqlite3
+
+# Logs
+*.log
