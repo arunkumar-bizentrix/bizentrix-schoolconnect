@@ -23,6 +23,9 @@ urlpatterns = [
 
     # Homework Management Endpoints
     path('api/v1/', include('apps.homework.urls')),
+
+    # Announcements & Circulars Endpoints
+    path('api/v1/', include('apps.announcements.urls')),
 ]
 
 if settings.DEBUG:
