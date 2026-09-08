@@ -23,7 +23,7 @@ class AuthFailure extends Failure {
 
 class ValidationFailure extends Failure {
   final Map<String, dynamic>? errors;
-  const ValidationFailure(super.message, {this.errors, super.statusCode = 400});
+  const ValidationFailure(String message, {this.errors}) : super(message, 400);
 }
 
 class CacheFailure extends Failure {

@@ -1,219 +1,366 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_constants.dart';
+import '../../../core/providers/school_providers.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final _usernameController = TextEditingController(text: 'teacher_priya');
+  final _passwordController = TextEditingController(text: 'Teacher@123');
   bool _obscurePassword = true;
-  bool _isLoading = false;
-  UserRole _selectedRole = UserRole.parent;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   void _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
 
-    setState(() => _isLoading = true);
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your username and password')),
+      );
+      return;
+    }
 
-    // Simulate network authentication
-    await Future.delayed(const Duration(milliseconds: 600));
-
+    final success = await ref.read(authProvider.notifier).login(username, password);
     if (!mounted) return;
-    setState(() => _isLoading = false);
 
-    // Navigate to respective dashboard based on role
-    switch (_selectedRole) {
-      case UserRole.admin:
-        context.go('/dashboard/admin');
-        break;
-      case UserRole.teacher:
-        context.go('/dashboard/teacher');
-        break;
-      case UserRole.parent:
-        context.go('/dashboard/parent');
-        break;
+    if (success) {
+      context.go('/dashboard');
+    } else {
+      final error = ref.read(authProvider).errorMessage ?? 'Login failed. Please check credentials.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: AppColors.priorityUrgentText),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final authState = ref.watch(authProvider);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // App Icon / Logo
-                  Center(
-                    child: Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 36),
+
+                    // Brand Emblem
+                    Center(
+                      child: Container(
+                        width: 68,
+                        height: 68,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.25),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.school_rounded,
+                          size: 38,
+                          color: Colors.white,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.school_rounded,
-                        size: 44,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // App Title & Tagline
+                    const Text(
+                      'SchoolConnect',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Connect  •  Communicate  •  Grow',
+                      style: TextStyle(
+                        fontSize: 13,
                         color: AppColors.primary,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 36),
 
-                  // Header Texts
-                  Text(
-                    AppConstants.appName,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: AppColors.primaryDark,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Structured school communication & homework',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 32),
+                    // Welcome Card
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.border),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.03),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'Welcome Back',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Sign in to your school account',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
 
-                  // Role Selector Label
-                  Text(
-                    'Select Your Role',
-                    style: theme.textTheme.titleMedium?.copyWith(fontSize: 14),
-                  ),
-                  const SizedBox(height: 10),
+                          // Username Input
+                          const Text(
+                            'Username',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _usernameController,
+                            decoration: InputDecoration(
+                              prefixIcon: const Icon(Icons.person_outline, size: 20, color: AppColors.textMuted),
+                              hintText: 'Enter username',
+                              filled: true,
+                              fillColor: AppColors.background,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
 
-                  // Role Segment Selection
-                  Row(
-                    children: UserRole.values.map((role) {
-                      final isSelected = _selectedRole == role;
-                      Color roleColor;
-                      switch (role) {
-                        case UserRole.admin:
-                          roleColor = AppColors.roleAdmin;
-                          break;
-                        case UserRole.teacher:
-                          roleColor = AppColors.roleTeacher;
-                          break;
-                        case UserRole.parent:
-                          roleColor = AppColors.roleParent;
-                          break;
-                      }
+                          // Password Input
+                          const Text(
+                            'Password',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            decoration: InputDecoration(
+                              prefixIcon: const Icon(Icons.lock_outline, size: 20, color: AppColors.textMuted),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                  size: 20,
+                                  color: AppColors.textMuted,
+                                ),
+                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                              ),
+                              hintText: 'Enter password',
+                              filled: true,
+                              fillColor: AppColors.background,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
 
-                      return Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                          child: InkWell(
-                            onTap: () => setState(() => _selectedRole = role),
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: isSelected ? roleColor.withOpacity(0.15) : AppColors.surface,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isSelected ? roleColor : AppColors.border,
-                                  width: isSelected ? 2 : 1,
+                          // Login Action Button
+                          SizedBox(
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: authState.isLoading ? null : _handleLogin,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              child: Text(
-                                role.label,
-                                textAlign: TextAlign.center,
+                              child: authState.isLoading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Text(
+                                      'Login',
+                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Forgot Password
+                          Center(
+                            child: TextButton(
+                              onPressed: () {},
+                              child: const Text(
+                                'Forgot Password?',
                                 style: TextStyle(
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                  color: isSelected ? roleColor : AppColors.textSecondary,
+                                  color: AppColors.primary,
                                   fontSize: 13,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Email or Username Input
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email or Mobile Number',
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
-                    validator: (val) =>
-                        (val == null || val.trim().isEmpty) ? 'Please enter your username/email' : null,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Password Input
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        ],
                       ),
                     ),
-                    validator: (val) =>
-                        (val == null || val.isEmpty) ? 'Please enter your password' : null,
-                  ),
-                  const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            ),
 
-                  // Login Action Button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _handleLogin,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text('Sign In as ${_selectedRole.label}'),
-                  ),
-                  const SizedBox(height: 20),
+            // Bottom School Building Graphic
+            _buildSchoolIllustration(),
+          ],
+        ),
+      ),
+    );
+  }
 
-                  // Help note
-                  Text(
-                    'Need assistance? Contact your school administration office.',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall,
+  Widget _buildSchoolIllustration() {
+    return SizedBox(
+      height: 110,
+      width: double.infinity,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          // Green Ground
+          Container(
+            height: 24,
+            decoration: const BoxDecoration(
+              color: Color(0xFF6EE7B7),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(30),
+                topRight: Radius.circular(30),
+              ),
+            ),
+          ),
+          // Stylized School House Center
+          Positioned(
+            bottom: 8,
+            child: Container(
+              width: 140,
+              height: 75,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFDE68A),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFD97706), width: 1.5),
+              ),
+              child: Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                  // Clock Tower
+                  Positioned(
+                    top: -16,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.access_time_rounded, size: 16, color: Colors.white),
+                    ),
+                  ),
+                  // Windows & Door
+                  Positioned(
+                    bottom: 0,
+                    child: Container(
+                      width: 22,
+                      height: 32,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF3B82F6),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(6),
+                          topRight: Radius.circular(6),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
           ),
-        ),
+          // Trees Left & Right
+          Positioned(
+            left: 40,
+            bottom: 12,
+            child: Icon(Icons.park, size: 36, color: Colors.green.shade600),
+          ),
+          Positioned(
+            right: 40,
+            bottom: 12,
+            child: Icon(Icons.park, size: 36, color: Colors.green.shade600),
+          ),
+        ],
       ),
     );
   }

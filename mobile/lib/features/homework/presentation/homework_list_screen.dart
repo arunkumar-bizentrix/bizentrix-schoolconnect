@@ -1,267 +1,242 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
-import '../models/homework_model.dart';
+import '../../../core/providers/school_providers.dart';
+import 'create_homework_screen.dart';
 
-class HomeworkListScreen extends StatefulWidget {
+class HomeworkListScreen extends ConsumerStatefulWidget {
   const HomeworkListScreen({super.key});
 
   @override
-  State<HomeworkListScreen> createState() => _HomeworkListScreenState();
+  ConsumerState<HomeworkListScreen> createState() => _HomeworkListScreenState();
 }
 
-class _HomeworkListScreenState extends State<HomeworkListScreen> {
-  int _selectedTabIndex = 0;
-
-  final List<HomeworkModel> _sampleHomework = [
-    HomeworkModel(
-      id: 'hw-1',
-      title: 'Linear Equations Exercise 4.2',
-      description: 'Solve questions 1 through 15 from Chapter 4 on graph paper. Ensure all steps are clearly shown.',
-      subject: 'Mathematics',
-      className: 'Class 6-B',
-      dueDate: DateTime.now().add(const Duration(days: 1)),
-      createdAt: DateTime.now().subtract(const Duration(hours: 4)),
-      teacherName: 'Mrs. Sharma',
-      attachments: [
-        const AttachmentModel(
-          id: 'att-1',
-          fileName: 'Exercise_4_2_Reference_Questions.pdf',
-          fileUrl: 'https://example.com/files/math_hw.pdf',
-          fileType: 'pdf',
-          fileSize: 1048576,
-        ),
-      ],
-    ),
-    HomeworkModel(
-      id: 'hw-2',
-      title: 'Essay: The Role of Technology in Modern Education',
-      description: 'Write a 300-word structured essay exploring both positive impacts and challenges of digital classrooms.',
-      subject: 'English',
-      className: 'Class 6-B',
-      dueDate: DateTime.now().add(const Duration(days: 3)),
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      teacherName: 'Mr. David',
-      attachments: [],
-    ),
-    HomeworkModel(
-      id: 'hw-3',
-      title: 'Photosynthesis Diagram and Lab Observations',
-      description: 'Draw and label the plant chloroplast diagram. Write a summary of the sunlight absorption experiment.',
-      subject: 'Science',
-      className: 'Class 6-B',
-      dueDate: DateTime.now().add(const Duration(days: 4)),
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      teacherName: 'Ms. Anita',
-      attachments: [
-        const AttachmentModel(
-          id: 'att-2',
-          fileName: 'Chloroplast_Diagram_Sample.jpg',
-          fileUrl: 'https://example.com/files/chloroplast.jpg',
-          fileType: 'image',
-          fileSize: 524288,
-        ),
-      ],
-    ),
-  ];
+class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
+  String _selectedTab = 'All';
+  final List<String> _tabs = ['All', 'Upcoming', 'Overdue'];
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Homework Assignments'),
-      ),
-      body: Column(
+    final homeworkAsync = ref.watch(homeworkProvider);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Filter Tabs
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Row(
-              children: [
-                _buildFilterChip('All Assignments', 0),
-                const SizedBox(width: 8),
-                _buildFilterChip('Due This Week', 1),
-                const SizedBox(width: 8),
-                _buildFilterChip('Completed', 2),
-              ],
-            ),
+          // Header Row with Add Homework Button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Homework',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Create and manage homework assignments',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CreateHomeworkScreen()),
+                  );
+                },
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Add Homework', style: TextStyle(fontSize: 12)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+              ),
+            ],
           ),
-          const Divider(),
+          const SizedBox(height: 16),
+
+          // Filter Tabs (All, Upcoming, Overdue)
+          Row(
+            children: _tabs.map((tab) {
+              final isSelected = _selectedTab == tab;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: ChoiceChip(
+                  label: Text(tab),
+                  selected: isSelected,
+                  onSelected: (_) => setState(() => _selectedTab = tab),
+                  selectedColor: AppColors.primary,
+                  backgroundColor: Colors.white,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  ),
+                  side: BorderSide(color: isSelected ? AppColors.primary : AppColors.border),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  showCheckmark: false,
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
 
           // Homework List
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: _sampleHomework.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final hw = _sampleHomework[index];
-                return _buildHomeworkCard(hw);
-              },
-            ),
+          homeworkAsync.when(
+            data: (list) {
+              final filtered = list.where((item) {
+                if (_selectedTab == 'Upcoming') return !item.isOverdue;
+                if (_selectedTab == 'Overdue') return item.isOverdue;
+                return true;
+              }).toList();
+
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: filtered.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final item = filtered[index];
+                  return _buildHomeworkCard(item, index);
+                },
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, _) => Text('Error loading homework: $err'),
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, int index) {
-    final isSelected = _selectedTabIndex == index;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (_) => setState(() => _selectedTabIndex = index),
-      selectedColor: AppColors.primary.withOpacity(0.15),
-      labelStyle: TextStyle(
-        color: isSelected ? AppColors.primary : AppColors.textSecondary,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        fontSize: 12,
-      ),
-    );
-  }
+  Widget _buildHomeworkCard(item, int index) {
+    Color iconBg;
+    Color iconColor;
+    IconData iconData;
 
-  Widget _buildHomeworkCard(HomeworkModel hw) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    hw.subject,
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                Text(
-                  'Due: ${hw.dueDate.day}/${hw.dueDate.month}/${hw.dueDate.year}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.warning, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              hw.title,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              hw.description,
-              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.person_pin, size: 16, color: AppColors.textMuted),
-                const SizedBox(width: 4),
-                Text(
-                  '${hw.teacherName} • ${hw.className}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                ),
-              ],
-            ),
-            if (hw.attachments.isNotEmpty) ...[
-              const Divider(height: 20),
-              Wrap(
-                spacing: 8,
-                children: hw.attachments.map((attachment) {
-                  final isPdf = attachment.fileType == 'pdf';
-                  return ActionChip(
-                    avatar: Icon(
-                      isPdf ? Icons.picture_as_pdf : Icons.image,
-                      size: 16,
-                      color: isPdf ? AppColors.error : AppColors.secondary,
-                    ),
-                    label: Text(
-                      attachment.fileName,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    onPressed: () {
-                      _showAttachmentDialog(attachment);
-                    },
-                  );
-                }).toList(),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
+    final sub = item.subject.toLowerCase();
+    if (sub.contains('math')) {
+      iconBg = index == 0 ? AppColors.mathIconBg : AppColors.defaultIconBg;
+      iconColor = index == 0 ? AppColors.mathIconColor : AppColors.defaultIconColor;
+      iconData = Icons.calculate_outlined;
+    } else if (sub.contains('sci')) {
+      iconBg = AppColors.scienceIconBg;
+      iconColor = AppColors.scienceIconColor;
+      iconData = Icons.eco_outlined;
+    } else if (sub.contains('eng')) {
+      iconBg = AppColors.englishIconBg;
+      iconColor = AppColors.englishIconColor;
+      iconData = Icons.menu_book_outlined;
+    } else {
+      iconBg = AppColors.socialIconBg;
+      iconColor = AppColors.socialIconColor;
+      iconData = Icons.public_outlined;
+    }
 
-  void _showAttachmentDialog(AttachmentModel attachment) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              attachment.fileType == 'pdf' ? Icons.picture_as_pdf : Icons.image,
-              color: attachment.fileType == 'pdf' ? AppColors.error : AppColors.secondary,
+    final formattedDate = DateFormat('MMM dd, yyyy').format(item.dueDate);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Subject Icon Avatar
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'Attachment Preview',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('File Name: ${attachment.fileName}'),
-            const SizedBox(height: 8),
-            Text('File Type: ${attachment.fileType.toUpperCase()}'),
-            const SizedBox(height: 16),
-            Container(
-              height: 120,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceElevated,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+            child: Icon(iconData, color: iconColor, size: 22),
+          ),
+          const SizedBox(width: 12),
+
+          // Homework Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Icon(Icons.file_present_rounded, size: 40, color: AppColors.primary),
-                    SizedBox(height: 8),
-                    Text('Secure Document Viewer', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    if (item.isOverdue)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.statusOverdueBg,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Overdue',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.statusOverdueText,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 3),
+                Text(
+                  item.classroomName,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Due: $formattedDate',
+                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
           ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Opening ${attachment.fileName}...')),
-              );
-            },
-            icon: const Icon(Icons.download, size: 16),
-            label: const Text('Download / Open'),
+
+          // Three Dots Action Menu
+          IconButton(
+            icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textMuted),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () {},
           ),
         ],
       ),

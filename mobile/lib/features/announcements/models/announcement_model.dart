@@ -1,41 +1,53 @@
-import '../../homework/models/homework_model.dart';
-
 class AnnouncementModel {
-  final String id;
+  final int id;
   final String title;
   final String content;
-  final String priority; // 'normal', 'urgent'
-  final String targetAudience; // 'all', 'parents', 'teachers'
-  final String authorName;
-  final DateTime createdAt;
-  final List<AttachmentModel> attachments;
+  final String priority; // 'URGENT', 'IMPORTANT', 'NORMAL'
+  final String audienceType; // 'SCHOOL', 'CLASS'
+  final int? targetClassId;
+  final String? targetClassName;
+  final String createdByName;
+  final DateTime publishedAt;
+  final String? attachmentUrl;
+  final bool isActive;
 
   const AnnouncementModel({
     required this.id,
     required this.title,
     required this.content,
-    this.priority = 'normal',
-    this.targetAudience = 'all',
-    required this.authorName,
-    required this.createdAt,
-    this.attachments = const [],
+    this.priority = 'NORMAL',
+    this.audienceType = 'SCHOOL',
+    this.targetClassId,
+    this.targetClassName,
+    this.createdByName = 'Priya Sharma (Teacher)',
+    required this.publishedAt,
+    this.attachmentUrl,
+    this.isActive = true,
   });
 
-  bool get isUrgent => priority.toLowerCase() == 'urgent';
+  bool get isUrgent => priority.toUpperCase() == 'URGENT';
+  bool get isImportant => priority.toUpperCase() == 'IMPORTANT';
+
+  String get audienceLabel {
+    if (audienceType.toUpperCase() == 'CLASS' && targetClassName != null && targetClassName!.isNotEmpty) {
+      return 'For $targetClassName';
+    }
+    return 'For All Students';
+  }
 
   factory AnnouncementModel.fromJson(Map<String, dynamic> json) {
     return AnnouncementModel(
-      id: json['id']?.toString() ?? '',
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       title: json['title'] ?? '',
       content: json['content'] ?? '',
-      priority: json['priority'] ?? 'normal',
-      targetAudience: json['target_audience'] ?? 'all',
-      authorName: json['author_name'] ?? 'School Administration',
-      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
-      attachments: (json['attachments'] as List<dynamic>?)
-              ?.map((item) => AttachmentModel.fromJson(item as Map<String, dynamic>))
-              .toList() ??
-          [],
+      priority: json['priority'] ?? 'NORMAL',
+      audienceType: json['audience_type'] ?? 'SCHOOL',
+      targetClassId: json['target_class'] is int ? json['target_class'] : null,
+      targetClassName: json['target_class_name'],
+      createdByName: json['created_by_name'] ?? 'School Administration',
+      publishedAt: DateTime.tryParse(json['published_at'] ?? '') ?? DateTime.now(),
+      attachmentUrl: json['attachment_url'],
+      isActive: json['is_active'] ?? true,
     );
   }
 
@@ -45,10 +57,11 @@ class AnnouncementModel {
       'title': title,
       'content': content,
       'priority': priority,
-      'target_audience': targetAudience,
-      'author_name': authorName,
-      'created_at': createdAt.toIso8601String(),
-      'attachments': attachments.map((a) => a.toJson()).toList(),
+      'audience_type': audienceType,
+      'target_class': targetClassId,
+      'target_class_name': targetClassName,
+      'attachment_url': attachmentUrl,
+      'is_active': isActive,
     };
   }
 }

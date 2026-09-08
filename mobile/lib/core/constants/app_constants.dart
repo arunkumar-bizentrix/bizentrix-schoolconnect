@@ -3,10 +3,8 @@ class AppConstants {
   static const String appName = 'Bizentrix SchoolConnect';
   static const String appVersion = '1.0.0';
 
-  // Base API configuration (configurable for local dev vs production)
-  // For Android emulator: 10.0.2.2 points to host machine localhost
-  // For real Android device: use LAN IP (e.g., 192.168.x.x) or production URL
-  static const String defaultBaseUrl = 'http://10.0.2.2:8000/api/v1';
+  // Base API configuration (with `adb reverse tcp:8000 tcp:8000` for physical devices)
+  static const String defaultBaseUrl = 'http://127.0.0.1:8000/api/v1';
 
   // Local & Secure Storage Keys
   static const String tokenKey = 'jwt_access_token';

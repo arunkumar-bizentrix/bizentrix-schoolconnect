@@ -1,90 +1,60 @@
-class AttachmentModel {
-  final String id;
-  final String fileName;
-  final String fileUrl;
-  final String fileType; // 'pdf', 'image', etc.
-  final int? fileSize;
-
-  const AttachmentModel({
-    required this.id,
-    required this.fileName,
-    required this.fileUrl,
-    required this.fileType,
-    this.fileSize,
-  });
-
-  factory AttachmentModel.fromJson(Map<String, dynamic> json) {
-    return AttachmentModel(
-      id: json['id']?.toString() ?? '',
-      fileName: json['file_name'] ?? 'attachment',
-      fileUrl: json['file_url'] ?? '',
-      fileType: json['file_type'] ?? 'unknown',
-      fileSize: json['file_size'],
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'file_name': fileName,
-      'file_url': fileUrl,
-      'file_type': fileType,
-      'file_size': fileSize,
-    };
-  }
-}
-
 class HomeworkModel {
-  final String id;
+  final int id;
+  final int? classroomId;
+  final String classroomName;
+  final String subject;
   final String title;
   final String description;
-  final String subject;
-  final String className;
+  final String assignedByName;
+  final DateTime assignedDate;
   final DateTime dueDate;
-  final DateTime createdAt;
-  final String teacherName;
-  final List<AttachmentModel> attachments;
+  final String? attachmentUrl;
+  final bool isActive;
 
   const HomeworkModel({
     required this.id,
+    this.classroomId,
+    required this.classroomName,
+    required this.subject,
     required this.title,
     required this.description,
-    required this.subject,
-    required this.className,
+    this.assignedByName = 'Priya Sharma',
+    required this.assignedDate,
     required this.dueDate,
-    required this.createdAt,
-    required this.teacherName,
-    this.attachments = const [],
+    this.attachmentUrl,
+    this.isActive = true,
   });
+
+  bool get isOverdue => dueDate.isBefore(DateTime.now());
 
   factory HomeworkModel.fromJson(Map<String, dynamic> json) {
     return HomeworkModel(
-      id: json['id']?.toString() ?? '',
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      classroomId: json['classroom'] is int ? json['classroom'] : null,
+      classroomName: json['classroom_name'] ?? 'Grade 5 - A',
+      subject: json['subject'] ?? 'General',
       title: json['title'] ?? '',
       description: json['description'] ?? '',
-      subject: json['subject'] ?? '',
-      className: json['class_name'] ?? '',
-      dueDate: DateTime.tryParse(json['due_date'] ?? '') ?? DateTime.now(),
-      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
-      teacherName: json['teacher_name'] ?? '',
-      attachments: (json['attachments'] as List<dynamic>?)
-              ?.map((item) => AttachmentModel.fromJson(item as Map<String, dynamic>))
-              .toList() ??
-          [],
+      assignedByName: json['assigned_by_name'] ?? 'Priya Sharma',
+      assignedDate: DateTime.tryParse(json['assigned_date'] ?? '') ?? DateTime.now(),
+      dueDate: DateTime.tryParse(json['due_date'] ?? '') ?? DateTime.now().add(const Duration(days: 2)),
+      attachmentUrl: json['attachment_url'],
+      isActive: json['is_active'] ?? true,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'classroom': classroomId,
+      'classroom_name': classroomName,
+      'subject': subject,
       'title': title,
       'description': description,
-      'subject': subject,
-      'class_name': className,
-      'due_date': dueDate.toIso8601String(),
-      'created_at': createdAt.toIso8601String(),
-      'teacher_name': teacherName,
-      'attachments': attachments.map((a) => a.toJson()).toList(),
+      'assigned_date': assignedDate.toIso8601String().split('T').first,
+      'due_date': dueDate.toIso8601String().split('T').first,
+      'attachment_url': attachmentUrl,
+      'is_active': isActive,
     };
   }
 }

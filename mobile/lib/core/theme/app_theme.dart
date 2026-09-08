@@ -14,7 +14,6 @@ class AppTheme {
         primary: AppColors.primary,
         secondary: AppColors.secondary,
         surface: AppColors.surface,
-        background: AppColors.background,
         error: AppColors.error,
         brightness: Brightness.light,
       ),
@@ -61,7 +60,7 @@ class AppTheme {
         ),
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
         margin: EdgeInsets.zero,

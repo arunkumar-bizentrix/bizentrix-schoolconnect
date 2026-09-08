@@ -1,0 +1,4475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bizentrix SchoolConnect - Interactive Live UI Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      color: #f8fafc;
+    }
+    .top-controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .brand-title {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+    .brand-logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      color: white;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 14px;
+    }
+    .screen-selector {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      max-width: 900px;
+      background: rgba(255,255,255,0.06);
+      padding: 8px;
+      border-radius: 12px;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .screen-btn {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #cbd5e1;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .screen-btn:hover {
+      background: rgba(255,255,255,0.1);
+      color: white;
+    }
+    .screen-btn.active {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: white;
+      box-shadow: 0 4px 12px rgba(37,99,235,0.4);
+    }
+
+    /* Mobile Phone Shell */
+    .phone-container {
+      width: 400px;
+      height: 840px;
+      background: #ffffff;
+      border-radius: 46px;
+      box-shadow: 0 25px 60px -15px rgba(0,0,0,0.7), 0 0 0 10px #1e293b, 0 0 0 12px #334155;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Status bar */
+    .status-bar {
+      height: 44px;
+      background: #ffffff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 24px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #0f172a;
+      z-index: 40;
+      flex-shrink: 0;
+    }
+    .status-icons {
+      display: flex;
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    /* Common App Bar */
+    .app-header {
+      height: 56px;
+      background: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+      z-index: 30;
+    }
+    .header-btn {
+      background: none;
+      border: none;
+      color: #0f172a;
+      font-size: 18px;
+      cursor: pointer;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .header-btn:hover {
+      background: #f1f5f9;
+    }
+    .teacher-profile-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 20px;
+      transition: background 0.2s;
+    }
+    .teacher-profile-chip:hover {
+      background: #f1f5f9;
+    }
+    .profile-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    .profile-info {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+    }
+    .profile-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+    .profile-role {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    /* Screen Views Container */
+    .screen-content {
+      flex: 1;
+      overflow-y: auto;
+      background: #f8fafc;
+      position: relative;
+    }
+    .screen-content::-webkit-scrollbar {
+      width: 4px;
+    }
+    .screen-content::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .screen-view {
+      display: none;
+      min-height: 100%;
+      flex-direction: column;
+    }
+    .screen-view.active {
+      display: flex;
+    }
+
+    /* Bottom Navigation Bar */
+    .bottom-nav {
+      height: 64px;
+      background: #ffffff;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      flex-shrink: 0;
+      z-index: 30;
+      padding-bottom: 6px;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      color: #94a3b8;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 64px;
+    }
+    .nav-item i {
+      font-size: 18px;
+    }
+    .nav-item.active {
+      color: #2563eb;
+    }
+    .nav-item:hover {
+      color: #2563eb;
+    }
+
+    /* Side Drawer */
+    .drawer-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .drawer-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .side-drawer {
+      position: absolute;
+      top: 0;
+      left: -280px;
+      width: 270px;
+      height: 100%;
+      background: #0f172a;
+      z-index: 101;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 16px;
+      color: white;
+    }
+    .drawer-overlay.open .side-drawer {
+      transform: translateX(280px);
+    }
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding: 0 8px;
+    }
+    .drawer-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #94a3b8;
+      cursor: pointer;
+      margin-bottom: 4px;
+      transition: all 0.2s;
+    }
+    .drawer-item:hover, .drawer-item.active {
+      background: #2563eb;
+      color: white;
+    }
+    .drawer-logout {
+      margin-top: auto;
+      border-top: 1px solid #1e293b;
+      padding-top: 14px;
+      color: #ef4444;
+    }
+
+    /* ==========================================================================
+       AUTHENTICATION STYLES (Sign In, OTP, Register, Forgot & Reset Password)
+       ========================================================================== */
+    .auth-container {
+      padding: 22px 20px;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      min-height: 100%;
+      position: relative;
+    }
+    .auth-top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      height: 38px;
+    }
+    .auth-back-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .auth-back-btn:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+      border-color: #cbd5e1;
+    }
+    .auth-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #2563eb;
+      background: #eff6ff;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+    .auth-header-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 18px;
+    }
+    .auth-logo {
+      width: 54px;
+      height: 54px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      color: white;
+      box-shadow: 0 8px 20px rgba(37,99,235,0.25);
+      margin-bottom: 10px;
+    }
+    .auth-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.4px;
+      margin-bottom: 4px;
+    }
+    .auth-subtitle {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.5;
+      max-width: 300px;
+      margin: 0 auto;
+    }
+    .auth-card {
+      background: #ffffff;
+      border-radius: 18px;
+      border: 1px solid #e2e8f0;
+      padding: 20px 18px;
+      box-shadow: 0 8px 25px -8px rgba(0,0,0,0.05);
+      margin-bottom: 14px;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+    .phone-input-wrap {
+      display: flex;
+      align-items: center;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      background: #f8fafc;
+      height: 46px;
+      overflow: hidden;
+      transition: all 0.2s;
+    }
+    .phone-input-wrap:focus-within {
+      border-color: #2563eb;
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    }
+    .phone-input-wrap.error {
+      border-color: #ef4444;
+      background: #fef2f2;
+    }
+    .phone-prefix {
+      padding: 0 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+      border-right: 1px solid #e2e8f0;
+      background: #f1f5f9;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+    .phone-input {
+      border: none;
+      background: transparent;
+      padding: 0 12px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #0f172a;
+      width: 100%;
+      outline: none;
+      letter-spacing: 0.5px;
+    }
+    .input-box {
+      width: 100%;
+      height: 44px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0 12px;
+      font-size: 13px;
+      background: #f8fafc;
+      outline: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.2s;
+    }
+    .input-box:focus-within {
+      border-color: #2563eb;
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    }
+    .input-box.error {
+      border-color: #ef4444;
+      background: #fef2f2;
+    }
+    .input-box i {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    .input-box input {
+      border: none;
+      background: transparent;
+      outline: none;
+      width: 100%;
+      font-size: 13px;
+      color: #0f172a;
+    }
+    .or-divider {
+      display: flex;
+      align-items: center;
+      margin: 16px 0;
+      gap: 12px;
+    }
+    .or-divider::before, .or-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
+    .or-text {
+      font-size: 11px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .btn-auth-primary {
+      width: 100%;
+      height: 46px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .btn-auth-primary:hover:not(:disabled) {
+      background: #1d4ed8;
+      box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+    }
+    .btn-auth-primary:disabled {
+      background: #cbd5e1;
+      color: #64748b;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .btn-auth-secondary {
+      width: 100%;
+      height: 42px;
+      background: #f8fafc;
+      color: #334155;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .btn-auth-secondary:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+      border-color: #cbd5e1;
+    }
+    .field-error-msg {
+      font-size: 11px;
+      color: #ef4444;
+      font-weight: 600;
+      margin-top: 5px;
+      display: none;
+      align-items: center;
+      gap: 4px;
+    }
+    .field-error-msg.show {
+      display: flex;
+    }
+    .password-panel {
+      display: none;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px dashed #e2e8f0;
+    }
+    .password-panel.open {
+      display: block;
+      animation: fadeInPanel 0.25s ease-out;
+    }
+    @keyframes fadeInPanel {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .auth-footer-link {
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 12px;
+    }
+    .auth-footer-link a {
+      color: #2563eb;
+      font-weight: 700;
+      text-decoration: none;
+      margin-left: 4px;
+      cursor: pointer;
+    }
+    .auth-footer-link a:hover {
+      text-decoration: underline;
+    }
+    /* OTP Screen styles */
+    .masked-phone-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      margin: 8px auto 14px auto;
+    }
+    .otp-inputs-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      margin: 18px 0 12px 0;
+    }
+    .otp-box {
+      width: 44px;
+      height: 50px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      background: #f8fafc;
+      text-align: center;
+      font-size: 22px;
+      font-weight: 800;
+      color: #0f172a;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .otp-box:focus {
+      border-color: #2563eb;
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+    }
+    .otp-box.error {
+      border-color: #ef4444;
+      background: #fef2f2;
+      color: #dc2626;
+    }
+    .otp-demo-hint {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #f0fdf4;
+      border: 1px dashed #86efac;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #166534;
+      margin-bottom: 14px;
+    }
+    .otp-timer-box {
+      font-size: 12px;
+      color: #64748b;
+      text-align: center;
+      margin: 12px 0 18px 0;
+    }
+    .resend-btn {
+      background: none;
+      border: none;
+      color: #2563eb;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0;
+    }
+    .resend-btn:disabled {
+      color: #94a3b8;
+      cursor: not-allowed;
+      text-decoration: none;
+    }
+    /* Role Selector */
+    .role-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .role-card {
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .role-card i {
+      font-size: 22px;
+      color: #64748b;
+      transition: color 0.2s;
+    }
+    .role-card .role-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .role-card .role-desc {
+      font-size: 10px;
+      color: #94a3b8;
+      line-height: 1.3;
+    }
+    .role-card.active {
+      border-color: #2563eb;
+      background: #eff6ff;
+    }
+    .role-card.active i, .role-card.active .role-title {
+      color: #2563eb;
+    }
+    .school-code-notice {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      background: #fffbeb;
+      border: 1px solid #fef3c7;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      font-size: 11px;
+      color: #92400e;
+      line-height: 1.4;
+    }
+    .success-card-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 30px 16px;
+    }
+    .success-icon-wrap {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #dcfce7;
+      color: #16a34a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      margin-bottom: 16px;
+      animation: scalePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes scalePop {
+      0% { transform: scale(0.6); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .school-graphic {
+      width: 100%;
+      height: 70px;
+      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100"><path d="M0,80 Q200,60 400,80 L400,100 L0,100 Z" fill="%236ee7b7"/><rect x="150" y="30" width="100" height="50" rx="6" fill="%23fde68a" stroke="%23d97706" stroke-width="2"/><polygon points="200,10 180,30 220,30" fill="%23ef4444"/><rect x="190" y="55" width="20" height="25" fill="%233b82f6"/><circle cx="200" cy="22" r="5" fill="white"/><circle cx="90" cy="55" r="22" fill="%2310b981"/><circle cx="310" cy="55" r="22" fill="%2310b981"/></svg>') no-repeat center bottom;
+      background-size: contain;
+      margin-top: auto;
+    }
+
+    /* SCREEN 2: DASHBOARD */
+    .dashboard-pad {
+      padding: 16px 20px;
+    }
+    .page-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+    }
+    .page-subtitle {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
+      margin-bottom: 16px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    .stat-card {
+      padding: 14px;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+    }
+    .stat-cyan { background: #e0f2fe; color: #0284c7; }
+    .stat-green { background: #dcfce7; color: #16a34a; }
+    .stat-amber { background: #fef3c7; color: #d97706; }
+    .stat-purple { background: #f3e8ff; color: #9333ea; }
+    .stat-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .stat-icon-wrap {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      opacity: 0.9;
+    }
+    .stat-number {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .view-all-link {
+      font-size: 11px;
+      font-weight: 600;
+      color: #2563eb;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .notice-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .notice-card:hover {
+      border-color: #2563eb;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .notice-icon-box {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .notice-icon-amber { background: #fef3c7; color: #d97706; }
+    .notice-icon-red { background: #fee2e2; color: #dc2626; }
+    .notice-icon-purple { background: #ede9fe; color: #7c3aed; }
+    .notice-icon-blue { background: #dbeafe; color: #2563eb; }
+    .notice-details {
+      flex: 1;
+      min-width: 0;
+    }
+    .notice-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      margin-bottom: 3px;
+    }
+    .notice-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .badge {
+      font-size: 9px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .badge-urgent { background: #fee2e2; color: #dc2626; }
+    .badge-important { background: #ede9fe; color: #7c3aed; }
+    .badge-normal { background: #dbeafe; color: #2563eb; }
+    .badge-active { background: #dcfce7; color: #15803d; }
+    .badge-overdue { background: #fee2e2; color: #dc2626; }
+    .notice-sub {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 2px;
+    }
+    .notice-meta {
+      font-size: 10px;
+      color: #94a3b8;
+    }
+
+    /* SCREEN 3: CLASSES */
+    .btn-add {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ── Modal Overlay ── */
+    .modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15,23,42,0.55);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease;
+    }
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-card {
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 24px 20px 20px;
+      width: calc(100% - 48px);
+      max-width: 340px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.18);
+      transform: translateY(20px) scale(0.97);
+      transition: transform 0.22s ease, opacity 0.22s ease;
+      opacity: 0;
+    }
+    .modal-overlay.open .modal-card {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+    .modal-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 18px;
+      letter-spacing: -0.3px;
+    }
+    .modal-field {
+      margin-bottom: 14px;
+    }
+    .modal-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 5px;
+    }
+    .modal-input {
+      width: 100%;
+      height: 42px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0 12px;
+      font-size: 13px;
+      color: #0f172a;
+      background: #f8fafc;
+      outline: none;
+      box-sizing: border-box;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+    .modal-input:focus {
+      border-color: #2563eb;
+      background: #fff;
+    }
+    .modal-input.error {
+      border-color: #ef4444;
+      background: #fff5f5;
+    }
+    .modal-error {
+      font-size: 11px;
+      color: #ef4444;
+      margin-top: 4px;
+      display: none;
+    }
+    .modal-error.show {
+      display: block;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .modal-btn-cancel {
+      flex: 1;
+      height: 42px;
+      background: #f1f5f9;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #64748b;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .modal-btn-cancel:hover { background: #e2e8f0; }
+    .modal-btn-submit {
+      flex: 1;
+      height: 42px;
+      background: #2563eb;
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: white;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .modal-btn-submit:hover { background: #1d4ed8; }
+    .card-actions-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+    }
+    .card-action-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #64748b;
+      font-size: 11px;
+      transition: all 0.15s;
+    }
+    .card-action-btn:hover {
+      background: #eff6ff;
+      color: #2563eb;
+      border-color: #bfdbfe;
+    }
+    .card-action-btn.btn-delete:hover {
+      background: #fef2f2;
+      color: #ef4444;
+      border-color: #fecaca;
+    }
+    .btn-reset-demo {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-reset-demo:hover {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: #ef4444;
+      color: #fca5a5;
+    }
+    .class-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+    .class-avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 800;
+      color: white;
+      flex-shrink: 0;
+    }
+    .class-cyan   { background: #0284c7; }
+    .class-green  { background: #16a34a; }
+    .class-purple { background: #7c3aed; }
+    .class-orange { background: #ea580c; }
+    .class-info {
+      flex: 1;
+    }
+    .class-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .class-teacher {
+      font-size: 11px;
+      color: #64748b;
+      margin: 2px 0;
+    }
+    .class-count {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    /* SCREEN 4: STUDENTS */
+    .search-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .search-input-wrap {
+      flex: 1;
+      height: 42px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+    }
+    .search-input-wrap input {
+      border: none;
+      outline: none;
+      width: 100%;
+      font-size: 12px;
+    }
+    .filter-btn-square {
+      width: 42px;
+      height: 42px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #475569;
+      cursor: pointer;
+    }
+    .chips-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 14px;
+    }
+    .chip {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      color: #64748b;
+    }
+    .chip.active {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: white;
+    }
+    .student-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .student-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #e0f2fe;
+      color: #2563eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+    }
+
+    /* SCREEN 5: HOMEWORK */
+    .hw-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .hw-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .icon-math { background: #fee2e2; color: #ef4444; }
+    .icon-sci { background: #dcfce7; color: #16a34a; }
+    .icon-eng { background: #dbeafe; color: #2563eb; }
+    .icon-soc { background: #fef3c7; color: #d97706; }
+    .icon-fractions { background: #f3e8ff; color: #9333ea; }
+
+    /* SCREEN 6: CREATE HOMEWORK */
+    .form-pad {
+      padding: 20px;
+    }
+    .select-box {
+      width: 100%;
+      height: 44px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0 12px;
+      font-size: 13px;
+      background: #ffffff;
+      outline: none;
+      color: #0f172a;
+      margin-bottom: 14px;
+    }
+    .textarea-box {
+      width: 100%;
+      height: 80px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      background: #ffffff;
+      outline: none;
+      color: #0f172a;
+      margin-bottom: 14px;
+      resize: none;
+    }
+    .upload-zone {
+      width: 100%;
+      border: 1.5px dashed #93c5fd;
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #ffffff;
+      cursor: pointer;
+      margin-bottom: 24px;
+    }
+    .upload-zone i {
+      font-size: 32px;
+      color: #2563eb;
+    }
+    .upload-zone span {
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .upload-zone small {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    /* SCREEN 8: ANNOUNCEMENT DETAIL */
+    .detail-pad {
+      padding: 22px 20px;
+      background: #ffffff;
+      min-height: 100%;
+    }
+    .detail-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.3;
+      margin: 12px 0;
+    }
+    .meta-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+    .detail-body {
+      font-size: 13px;
+      color: #334155;
+      line-height: 1.6;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 16px;
+      margin-top: 16px;
+      margin-bottom: 20px;
+    }
+    .attachment-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .pdf-icon {
+      width: 40px;
+      height: 40px;
+      background: #fee2e2;
+      color: #ef4444;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .author-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: #0f172a;
+      color: white;
+      padding: 10px 18px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  
+    /* RBAC & Profile Modal Styles */
+    .role-badge-admin { background: #fef2f2 !important; color: #dc2626 !important; border: 1px solid #fecaca; }
+    .role-badge-teacher { background: #eff6ff !important; color: #2563eb !important; border: 1px solid #bfdbfe; }
+    .role-badge-parent { background: #f0fdf4 !important; color: #16a34a !important; border: 1px solid #bbf7d0; }
+
+    .dash-quick-actions {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .dash-action-btn {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #1e293b;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: all 0.2s;
+    }
+    .dash-action-btn:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+      transform: translateY(-1px);
+    }
+    .dash-action-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .child-card {
+      background: white;
+      border-radius: 14px;
+      padding: 14px;
+      border: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .child-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #3b82f6;
+    }
+    .child-meta {
+      flex: 1;
+    }
+    .child-name {
+      font-size: 15px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .child-class {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .child-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: #ecfdf5;
+      color: #059669;
+      display: inline-block;
+      margin-top: 4px;
+    }
+    
+  </style>
+</head>
+<body>
+
+  <div class="top-controls">
+    <div class="brand-title">
+      <div class="brand-logo-icon"><i class="fa-solid fa-graduation-cap"></i></div>
+      Bizentrix SchoolConnect
+    </div>
+    <div class="subtitle">Interactive Live Mobile UI Prototype • Auth Flows & Dashboard Working</div>
+    <div class="screen-selector">
+      <button class="screen-btn" onclick="showScreen(1)">1. Sign In</button>
+      <button class="screen-btn active" onclick="showScreen(2)">2. Dashboard</button>
+      <button class="screen-btn" onclick="showScreen(3)">3. Classes</button>
+      <button class="screen-btn" onclick="showScreen(4)">4. Students</button>
+      <button class="screen-btn" onclick="showScreen(5)">5. Homework</button>
+      <button class="screen-btn" onclick="showScreen(6)">6. Create HW</button>
+      <button class="screen-btn" onclick="showScreen(7)">7. Notices</button>
+      <button class="screen-btn" onclick="showScreen(8)">8. Detail</button>
+      <button class="screen-btn" onclick="showScreen(9)">9. OTP Verify</button>
+      <button class="screen-btn" onclick="showScreen(10)">10. Register</button>
+      <button class="screen-btn" onclick="showScreen(11)">11. Forgot Pass</button>
+      <button class="screen-btn" onclick="showScreen(12)">12. Reset Pass</button>
+      <button class="screen-btn" onclick="showScreen(13)">13. Setup</button>
+    </div>
+  </div>
+
+  <!-- Mobile Frame -->
+  <div class="phone-container">
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span>9:41</span>
+      <div class="status-icons">
+        <i class="fa-solid fa-signal"></i>
+        <i class="fa-solid fa-wifi"></i>
+        <i class="fa-solid fa-battery-full"></i>
+      </div>
+    </div>
+
+    <!-- Common Top Bar (Screens 2, 3, 4, 5, 7) -->
+    <div class="app-header" id="commonHeader">
+      <button class="header-btn" onclick="toggleDrawer()"><i class="fa-solid fa-bars"></i></button>
+      <div class="teacher-profile-chip" id="headerProfileChip" onclick="openProfileModal()" title="View Profile / Logout">
+        <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100" class="profile-avatar" id="headerAvatar" alt="Avatar">
+        <div class="profile-info">
+          <span class="profile-name" id="headerProfileName">Priya Sharma</span>
+          <span class="profile-role" id="headerProfileRole">Teacher</span>
+        </div>
+        <i class="fa-solid fa-chevron-down" style="font-size: 10px; color: #64748b;"></i>
+      </div>
+    </div>
+
+    <!-- Side Navigation Drawer -->
+    <div class="drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()">
+      <div class="side-drawer" id="sideDrawerContent" onclick="event.stopPropagation()">
+        <div class="drawer-header">
+          <div class="brand-logo-icon"><i class="fa-solid fa-school"></i></div>
+          <span style="font-weight: 800; font-size: 16px;">SchoolConnect</span>
+        </div>
+        <div id="drawerNavItems">
+          <!-- Populated dynamically by renderRoleNavigation() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Screens Viewport -->
+    <div class="screen-content">
+
+      <!-- SCREEN 1: SIGN IN -->
+      <div class="screen-view" id="screen1">
+        <div class="auth-container">
+          <div class="auth-header-center" style="margin-top: 6px;">
+            <div class="auth-logo"><i class="fa-solid fa-graduation-cap"></i></div>
+            <div class="auth-title">SchoolConnect</div>
+            <div class="auth-subtitle">Connect • Communicate • Grow</div>
+          </div>
+
+          <div class="auth-card">
+
+            <!-- Demo Accounts Reference -->
+            <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px; font-size: 11px; color: #475569; margin-bottom: 14px; line-height: 1.5;">
+              <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;"><i class="fa-solid fa-key"></i> Demo Credentials:</div>
+              • <strong>Admin:</strong> <code>admin</code> / <code>Admin@123</code> (OTP: 9000000001)<br>
+              • <strong>Teacher:</strong> <code>teacher_priya</code> / <code>Teacher@123</code> (OTP: 9876543210)<br>
+              • <strong>Parent:</strong> <code>parent_ravi</code> / <code>Parent@123</code> (OTP: 9000000002)
+            </div>
+    
+            <div style="font-size: 17px; font-weight: 800; color: #0f172a; margin-bottom: 4px; text-align: center;">Sign In</div>
+            <div style="font-size: 12px; color: #64748b; margin-bottom: 18px; text-align: center;">Enter your mobile number to sign in</div>
+
+            <!-- Mobile Number Input -->
+            <div class="form-group">
+              <label class="form-label">Mobile Number <span style="color: #ef4444;">*</span></label>
+              <div class="phone-input-wrap" id="siMobileWrap">
+                <div class="phone-prefix"><i class="fa-solid fa-phone" style="font-size: 11px;"></i> +91</div>
+                <input type="tel" class="phone-input" id="siMobile" placeholder="10-digit mobile number" maxlength="10" autocomplete="tel" oninput="handleSiMobileInput(this)">
+              </div>
+              <div class="field-error-msg" id="siMobileErr"><i class="fa-solid fa-circle-exclamation"></i> Enter a valid 10-digit mobile number</div>
+            </div>
+
+            <button class="btn-auth-primary" id="siSendOtpBtn" disabled onclick="initiateSignInOtp()">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span id="siSendOtpBtnText">Send OTP</span>
+            </button>
+
+            <!-- OR Divider -->
+            <div class="or-divider">
+              <span class="or-text">OR</span>
+            </div>
+
+            <!-- Toggle Password Login Option -->
+            <button type="button" class="btn-auth-secondary" id="togglePassBtn" onclick="togglePasswordPanel()">
+              <i class="fa-solid fa-key"></i>
+              <span id="togglePassBtnText">Sign in with Password</span>
+            </button>
+
+            <!-- Password Login Panel (Collapsible) -->
+            <div class="password-panel" id="passwordPanel">
+              <div class="form-group">
+                <label class="form-label">Username or Mobile</label>
+                <div class="input-box" id="siUserBox">
+                  <i class="fa-regular fa-user"></i>
+                  <input type="text" id="loginUser" value="teacher_priya" placeholder="Username / Mobile" oninput="handlePasswordInputs()">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Password</label>
+                <div class="input-box" id="siPassBox">
+                  <i class="fa-solid fa-lock"></i>
+                  <input type="password" id="loginPass" value="12345678" placeholder="Enter password" oninput="handlePasswordInputs()">
+                  <i class="fa-regular fa-eye" id="loginPassEye" style="cursor: pointer;" onclick="togglePasswordVisibility('loginPass', 'loginPassEye')"></i>
+                </div>
+                <div class="field-error-msg" id="siPassErr"><i class="fa-solid fa-circle-exclamation"></i> Invalid credentials</div>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+                <a href="javascript:void(0)" style="font-size: 12px; color: #2563eb; text-decoration: none; font-weight: 700;" onclick="goToForgotPassword()">Forgot Password?</a>
+              </div>
+
+              <button class="btn-auth-primary" id="loginSubmitBtn" onclick="handlePasswordLogin()">
+                <i class="fa-solid fa-right-to-bracket"></i>
+                <span id="loginSubmitBtnText">Sign In</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Register Link -->
+          <div class="auth-footer-link">
+            Don't have an account? <a onclick="goToRegister()">Register</a>
+          </div>
+
+          <div class="school-graphic"></div>
+        </div>
+      </div>
+
+      <!-- SCREEN 9: OTP VERIFICATION -->
+      <div class="screen-view" id="screen9">
+        <div class="auth-container">
+          <div class="auth-top-bar">
+            <button class="auth-back-btn" onclick="handleOtpBack()"><i class="fa-solid fa-arrow-left"></i></button>
+            <div class="auth-badge"><i class="fa-solid fa-shield-halved"></i> OTP Verification</div>
+            <div style="width: 36px;"></div>
+          </div>
+
+          <div class="auth-header-center">
+            <div class="auth-logo" style="background: linear-gradient(135deg, #10b981, #059669);"><i class="fa-solid fa-shield-check"></i></div>
+            <div class="auth-title">Verification Code</div>
+            <div class="auth-subtitle">Enter the 6-digit OTP code sent to</div>
+            <div class="masked-phone-badge" id="otpMaskedNumber"><i class="fa-solid fa-mobile-screen"></i> +91 98••••••10</div>
+          </div>
+
+          <div class="auth-card">
+
+            <!-- Demo Accounts Reference -->
+            <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px; font-size: 11px; color: #475569; margin-bottom: 14px; line-height: 1.5;">
+              <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;"><i class="fa-solid fa-key"></i> Demo Credentials:</div>
+              • <strong>Admin:</strong> <code>admin</code> / <code>Admin@123</code> (OTP: 9000000001)<br>
+              • <strong>Teacher:</strong> <code>teacher_priya</code> / <code>Teacher@123</code> (OTP: 9876543210)<br>
+              • <strong>Parent:</strong> <code>parent_ravi</code> / <code>Parent@123</code> (OTP: 9000000002)
+            </div>
+    
+            <div class="otp-demo-hint">
+              <i class="fa-solid fa-key"></i> Demo OTP Code: <strong style="font-size: 13px; letter-spacing: 1px;">123456</strong>
+            </div>
+
+            <div class="otp-inputs-row" id="otpInputsRow">
+              <input type="text" maxlength="1" class="otp-box" id="otp1" inputmode="numeric" autocomplete="one-time-code" oninput="onOtpDigitInput(this, 0)" onkeydown="onOtpDigitKeydown(this, event, 0)" onpaste="handleOtpPaste(event)">
+              <input type="text" maxlength="1" class="otp-box" id="otp2" inputmode="numeric" oninput="onOtpDigitInput(this, 1)" onkeydown="onOtpDigitKeydown(this, event, 1)" onpaste="handleOtpPaste(event)">
+              <input type="text" maxlength="1" class="otp-box" id="otp3" inputmode="numeric" oninput="onOtpDigitInput(this, 2)" onkeydown="onOtpDigitKeydown(this, event, 2)" onpaste="handleOtpPaste(event)">
+              <input type="text" maxlength="1" class="otp-box" id="otp4" inputmode="numeric" oninput="onOtpDigitInput(this, 3)" onkeydown="onOtpDigitKeydown(this, event, 3)" onpaste="handleOtpPaste(event)">
+              <input type="text" maxlength="1" class="otp-box" id="otp5" inputmode="numeric" oninput="onOtpDigitInput(this, 4)" onkeydown="onOtpDigitKeydown(this, event, 4)" onpaste="handleOtpPaste(event)">
+              <input type="text" maxlength="1" class="otp-box" id="otp6" inputmode="numeric" oninput="onOtpDigitInput(this, 5)" onkeydown="onOtpDigitKeydown(this, event, 5)" onpaste="handleOtpPaste(event)">
+            </div>
+
+            <div class="field-error-msg" id="otpErrorMsg" style="justify-content: center; margin-bottom: 12px;">
+              <i class="fa-solid fa-circle-exclamation"></i> Invalid OTP. Please try again.
+            </div>
+
+            <button class="btn-auth-primary" id="verifyOtpBtn" disabled onclick="verifyOtpCode()">
+              <i class="fa-solid fa-check"></i>
+              <span id="verifyOtpBtnText">Verify OTP</span>
+            </button>
+
+            <div class="otp-timer-box">
+              <span id="otpTimerLabel">Resend OTP in </span><strong id="otpCountdown" style="color: #0f172a;">00:45</strong>
+              <div style="margin-top: 6px;">
+                <button type="button" class="resend-btn" id="resendOtpBtn" disabled onclick="resendOtpCode()">
+                  <i class="fa-solid fa-rotate-right"></i> Resend OTP
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="auth-footer-link">
+            Wrong mobile number? <a onclick="handleOtpBack()">Change Number</a>
+          </div>
+
+          <div class="school-graphic"></div>
+        </div>
+      </div>
+
+      <!-- SCREEN 10: REGISTER (School Controlled) -->
+      <div class="screen-view" id="screen10">
+        <div class="auth-container">
+          <div class="auth-top-bar">
+            <button class="auth-back-btn" onclick="showScreen(1)"><i class="fa-solid fa-arrow-left"></i></button>
+            <div class="auth-badge"><i class="fa-solid fa-building-columns"></i> School-Controlled</div>
+            <div style="width: 36px;"></div>
+          </div>
+
+          <div class="auth-header-center">
+            <div class="auth-logo" style="background: linear-gradient(135deg, #7c3aed, #6d28d9);"><i class="fa-solid fa-user-plus"></i></div>
+            <div class="auth-title">Create Your SchoolConnect Account</div>
+            <div class="auth-subtitle">School authorization is required to create a new user account</div>
+          </div>
+
+          <div class="auth-card">
+
+            <!-- Demo Accounts Reference -->
+            <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px; font-size: 11px; color: #475569; margin-bottom: 14px; line-height: 1.5;">
+              <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;"><i class="fa-solid fa-key"></i> Demo Credentials:</div>
+              • <strong>Admin:</strong> <code>admin</code> / <code>Admin@123</code> (OTP: 9000000001)<br>
+              • <strong>Teacher:</strong> <code>teacher_priya</code> / <code>Teacher@123</code> (OTP: 9876543210)<br>
+              • <strong>Parent:</strong> <code>parent_ravi</code> / <code>Parent@123</code> (OTP: 9000000002)
+            </div>
+    
+            <!-- School Restricted Notice -->
+            <div class="school-code-notice">
+              <i class="fa-solid fa-shield-halved" style="font-size: 14px; margin-top: 2px;"></i>
+              <div>
+                <strong>School Code Required:</strong> Unrestricted public registration is disabled. You must enter the official code provided by your school.
+              </div>
+            </div>
+
+            <!-- School Code -->
+            <div class="form-group">
+              <label class="form-label">School Code <span style="color: #ef4444;">*</span></label>
+              <div class="input-box" id="regCodeBox">
+                <i class="fa-solid fa-school-flag"></i>
+                <input type="text" id="regSchoolCode" placeholder="e.g. SCH2025" autocomplete="off" oninput="validateRegisterForm()" onblur="validateRegisterForm()">
+              </div>
+              <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Enter the school code provided by your school.</div>
+              <div class="field-error-msg" id="regSchoolCodeErr"><i class="fa-solid fa-circle-exclamation"></i> Invalid or unauthorized school code.</div>
+            </div>
+
+            <!-- Mobile Number -->
+            <div class="form-group">
+              <label class="form-label">Mobile Number <span style="color: #ef4444;">*</span></label>
+              <div class="phone-input-wrap" id="regMobileWrap">
+                <div class="phone-prefix"><i class="fa-solid fa-phone" style="font-size: 11px;"></i> +91</div>
+                <input type="tel" class="phone-input" id="regMobile" placeholder="10-digit mobile number" maxlength="10" autocomplete="tel" oninput="validateRegisterForm()">
+              </div>
+              <div class="field-error-msg" id="regMobileErr"><i class="fa-solid fa-circle-exclamation"></i> 10-digit mobile number required</div>
+            </div>
+
+            <!-- Role Selector (Teacher & Parent ONLY - No Admin) -->
+            <div class="form-group">
+              <label class="form-label">I am registering as a <span style="color: #ef4444;">*</span></label>
+              <div class="role-grid">
+                <div class="role-card" id="roleCardTeacher" onclick="setRegRole('Teacher')">
+                  <i class="fa-solid fa-chalkboard-user"></i>
+                  <span class="role-title">Teacher</span>
+                  <span class="role-desc">Manage classes, students & homework</span>
+                </div>
+                <div class="role-card active" id="roleCardParent" onclick="setRegRole('Parent')">
+                  <i class="fa-solid fa-user-group"></i>
+                  <span class="role-title">Parent</span>
+                  <span class="role-desc">View student reports, homework & notices</span>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn-auth-primary" id="regSendOtpBtn" disabled onclick="initiateRegisterOtp()">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span id="regSendOtpBtnText">Send OTP</span>
+            </button>
+          </div>
+
+          <div class="auth-footer-link">
+            Already have an account? <a onclick="showScreen(1)">Sign In</a>
+          </div>
+
+          <div class="school-graphic"></div>
+        </div>
+      </div>
+
+      <!-- SCREEN 11: FORGOT PASSWORD -->
+      <div class="screen-view" id="screen11">
+        <div class="auth-container">
+          <div class="auth-top-bar">
+            <button class="auth-back-btn" onclick="showScreen(1)"><i class="fa-solid fa-arrow-left"></i></button>
+            <div class="auth-badge"><i class="fa-solid fa-key"></i> Account Recovery</div>
+            <div style="width: 36px;"></div>
+          </div>
+
+          <div class="auth-header-center">
+            <div class="auth-logo" style="background: linear-gradient(135deg, #f59e0b, #d97706);"><i class="fa-solid fa-lock-open"></i></div>
+            <div class="auth-title">Forgot Password?</div>
+            <div class="auth-subtitle">Enter your registered mobile number and we will send you a verification code to reset your password.</div>
+          </div>
+
+          <div class="auth-card">
+
+            <!-- Demo Accounts Reference -->
+            <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px; font-size: 11px; color: #475569; margin-bottom: 14px; line-height: 1.5;">
+              <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;"><i class="fa-solid fa-key"></i> Demo Credentials:</div>
+              • <strong>Admin:</strong> <code>admin</code> / <code>Admin@123</code> (OTP: 9000000001)<br>
+              • <strong>Teacher:</strong> <code>teacher_priya</code> / <code>Teacher@123</code> (OTP: 9876543210)<br>
+              • <strong>Parent:</strong> <code>parent_ravi</code> / <code>Parent@123</code> (OTP: 9000000002)
+            </div>
+    
+            <div class="form-group">
+              <label class="form-label">Registered Mobile Number <span style="color: #ef4444;">*</span></label>
+              <div class="phone-input-wrap" id="fpMobileWrap">
+                <div class="phone-prefix"><i class="fa-solid fa-phone" style="font-size: 11px;"></i> +91</div>
+                <input type="tel" class="phone-input" id="fpMobile" placeholder="10-digit registered number" maxlength="10" autocomplete="tel" oninput="handleFpMobileInput(this)">
+              </div>
+              <div class="field-error-msg" id="fpMobileErr"><i class="fa-solid fa-circle-exclamation"></i> Enter a valid 10-digit registered mobile number</div>
+            </div>
+
+            <button class="btn-auth-primary" id="fpSendOtpBtn" disabled onclick="initiateForgotPassOtp()">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span id="fpSendOtpBtnText">Send OTP</span>
+            </button>
+          </div>
+
+          <div class="auth-footer-link">
+            Remembered your password? <a onclick="showScreen(1)">Sign In</a>
+          </div>
+
+          <div class="school-graphic"></div>
+        </div>
+      </div>
+
+      <!-- SCREEN 12: RESET PASSWORD -->
+      <div class="screen-view" id="screen12">
+        <div class="auth-container">
+          <div class="auth-top-bar">
+            <button class="auth-back-btn" onclick="showScreen(11)"><i class="fa-solid fa-arrow-left"></i></button>
+            <div class="auth-badge"><i class="fa-solid fa-lock"></i> Reset Password</div>
+            <div style="width: 36px;"></div>
+          </div>
+
+          <!-- Reset Password Form Card -->
+          <div id="resetFormCard">
+            <div class="auth-header-center">
+              <div class="auth-logo" style="background: linear-gradient(135deg, #10b981, #059669);"><i class="fa-solid fa-shield-halved"></i></div>
+              <div class="auth-title">Reset Password</div>
+              <div class="auth-subtitle">Create a new password for your account</div>
+            </div>
+
+            <div class="auth-card">
+
+            <!-- Demo Accounts Reference -->
+            <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px; font-size: 11px; color: #475569; margin-bottom: 14px; line-height: 1.5;">
+              <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;"><i class="fa-solid fa-key"></i> Demo Credentials:</div>
+              • <strong>Admin:</strong> <code>admin</code> / <code>Admin@123</code> (OTP: 9000000001)<br>
+              • <strong>Teacher:</strong> <code>teacher_priya</code> / <code>Teacher@123</code> (OTP: 9876543210)<br>
+              • <strong>Parent:</strong> <code>parent_ravi</code> / <code>Parent@123</code> (OTP: 9000000002)
+            </div>
+    
+              <div class="form-group">
+                <label class="form-label">New Password <span style="color: #ef4444;">*</span></label>
+                <div class="input-box" id="resetPassBox">
+                  <i class="fa-solid fa-lock"></i>
+                  <input type="password" id="resetNewPass" placeholder="Minimum 8 characters" oninput="validateResetPasswordForm()">
+                  <i class="fa-regular fa-eye" id="resetNewPassEye" style="cursor: pointer;" onclick="togglePasswordVisibility('resetNewPass', 'resetNewPassEye')"></i>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Confirm Password <span style="color: #ef4444;">*</span></label>
+                <div class="input-box" id="resetConfirmPassBox">
+                  <i class="fa-solid fa-shield-cat"></i>
+                  <input type="password" id="resetConfirmPass" placeholder="Re-enter password" oninput="validateResetPasswordForm()">
+                  <i class="fa-regular fa-eye" id="resetConfirmPassEye" style="cursor: pointer;" onclick="togglePasswordVisibility('resetConfirmPass', 'resetConfirmPassEye')"></i>
+                </div>
+                <div class="field-error-msg" id="resetPassErr"><i class="fa-solid fa-circle-exclamation"></i> Password must be at least 8 characters.</div>
+              </div>
+
+              <div style="font-size: 11px; color: #64748b; margin-bottom: 16px;">
+                <i class="fa-solid fa-circle-check" style="color: #10b981;"></i> Password must be at least 8 characters.
+              </div>
+
+              <button class="btn-auth-primary" id="resetSubmitBtn" disabled onclick="submitResetPassword()">
+                <i class="fa-solid fa-check"></i>
+                <span id="resetSubmitBtnText">Reset Password</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Reset Success State View (Initially Hidden) -->
+          <div class="auth-card success-card-view" id="resetSuccessCard" style="display: none;">
+            <div class="success-icon-wrap"><i class="fa-solid fa-circle-check"></i></div>
+            <div style="font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 8px;">✓ Password Reset Successful</div>
+            <div style="font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 22px;">
+              Your password has been updated.
+            </div>
+            <button class="btn-auth-primary" onclick="returnToSignInAfterReset()">
+              <i class="fa-solid fa-arrow-right-to-bracket"></i>
+              <span>Back to Sign In</span>
+            </button>
+          </div>
+
+          <div class="school-graphic"></div>
+        </div>
+      </div>
+
+      <!-- SCREEN 13: ACCOUNT SETUP (Post-Registration Setup) -->
+      <div class="screen-view" id="screen13">
+        <div class="auth-container">
+          <div class="auth-top-bar">
+            <button class="auth-back-btn" onclick="handleSetupBack()"><i class="fa-solid fa-arrow-left"></i></button>
+            <div class="auth-badge" id="setupRoleBadge"><i class="fa-solid fa-user-check"></i> Step 2</div>
+            <div style="width: 36px;"></div>
+          </div>
+
+          <div class="auth-header-center">
+            <div class="auth-logo" style="background: linear-gradient(135deg, #0284c7, #0369a1);"><i class="fa-solid fa-id-card"></i></div>
+            <div class="auth-title">Complete Your Profile</div>
+            <div class="auth-subtitle">Set up your profile name and login password to complete registration</div>
+          </div>
+
+          <div class="auth-card">
+
+            <!-- Demo Accounts Reference -->
+            <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px; font-size: 11px; color: #475569; margin-bottom: 14px; line-height: 1.5;">
+              <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;"><i class="fa-solid fa-key"></i> Demo Credentials:</div>
+              • <strong>Admin:</strong> <code>admin</code> / <code>Admin@123</code> (OTP: 9000000001)<br>
+              • <strong>Teacher:</strong> <code>teacher_priya</code> / <code>Teacher@123</code> (OTP: 9876543210)<br>
+              • <strong>Parent:</strong> <code>parent_ravi</code> / <code>Parent@123</code> (OTP: 9000000002)
+            </div>
+    
+            <!-- Role info banner with Role confirmation chip -->
+            <div style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px;">
+              <div style="font-size: 12px; color: #64748b;">
+                Role: <span id="setupConfirmedRole" style="color: #2563eb; font-weight: 700; background: #eff6ff; padding: 2px 8px; border-radius: 6px;">Teacher</span>
+              </div>
+              <div style="font-size: 12px; color: #16a34a; font-weight: 700;"><i class="fa-solid fa-check-circle"></i> Phone Verified</div>
+            </div>
+
+            <!-- Full Name -->
+            <div class="form-group">
+              <label class="form-label">Full Name <span style="color: #ef4444;">*</span></label>
+              <div class="input-box" id="setupNameBox">
+                <i class="fa-regular fa-user"></i>
+                <input type="text" id="setupFullName" placeholder="e.g. Ramesh Kumar" oninput="validateSetupForm()">
+              </div>
+              <div class="field-error-msg" id="setupNameErr"><i class="fa-solid fa-circle-exclamation"></i> Full Name is required</div>
+            </div>
+
+            <!-- Email (Optional) -->
+            <div class="form-group">
+              <label class="form-label">Email Address <span style="font-size: 11px; font-weight: 500; color: #94a3b8;">(Optional)</span></label>
+              <div class="input-box">
+                <i class="fa-regular fa-envelope"></i>
+                <input type="email" id="setupEmail" placeholder="e.g. parent@example.com">
+              </div>
+            </div>
+
+            <!-- Create Password (Min 8 chars) -->
+            <div class="form-group">
+              <label class="form-label">Create Password <span style="color: #ef4444;">*</span></label>
+              <div class="input-box" id="setupPassBox">
+                <i class="fa-solid fa-lock"></i>
+                <input type="password" id="setupPass" placeholder="Minimum 8 characters" oninput="validateSetupForm()">
+                <i class="fa-regular fa-eye" id="setupPassEye" style="cursor: pointer;" onclick="togglePasswordVisibility('setupPass', 'setupPassEye')"></i>
+              </div>
+            </div>
+
+            <!-- Confirm Password -->
+            <div class="form-group">
+              <label class="form-label">Confirm Password <span style="color: #ef4444;">*</span></label>
+              <div class="input-box" id="setupConfirmPassBox">
+                <i class="fa-solid fa-shield-cat"></i>
+                <input type="password" id="setupConfirmPass" placeholder="Re-enter password" oninput="validateSetupForm()">
+                <i class="fa-regular fa-eye" id="setupConfirmPassEye" style="cursor: pointer;" onclick="togglePasswordVisibility('setupConfirmPass', 'setupConfirmPassEye')"></i>
+              </div>
+              <div class="field-error-msg" id="setupPassErr"><i class="fa-solid fa-circle-exclamation"></i> Password must be at least 8 characters.</div>
+            </div>
+
+            <button class="btn-auth-primary" id="setupSubmitBtn" disabled onclick="submitAccountSetup()">
+              <i class="fa-solid fa-circle-check"></i>
+              <span id="setupSubmitBtnText">Complete & Go to Dashboard</span>
+            </button>
+          </div>
+
+          <div class="school-graphic"></div>
+        </div>
+      </div>
+
+      <!-- SCREEN 2: DASHBOARD -->
+      <div class="screen-view active" id="screen2">
+        <div class="dashboard-pad">
+          <div class="page-title" id="dashPageTitle">Teacher Dashboard</div>
+          <div class="page-subtitle" id="dashPageSubtitle">Welcome back, Priya!</div>
+
+          <!-- 4 Stat Cards -->
+          <div class="stats-grid" id="dashStatsGrid">
+            <div class="stat-card stat-cyan" onclick="showScreen(3)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-regular fa-user"></i></div>
+                <div class="stat-label">My Classes</div>
+              </div>
+              <div class="stat-number">2</div>
+            </div>
+            <div class="stat-card stat-green" onclick="showScreen(4)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-solid fa-users"></i></div>
+                <div class="stat-label">Total Students</div>
+              </div>
+              <div class="stat-number">48</div>
+            </div>
+            <div class="stat-card stat-amber" onclick="showScreen(5)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-regular fa-file-lines"></i></div>
+                <div class="stat-label">Homework</div>
+              </div>
+              <div class="stat-number">5</div>
+            </div>
+            <div class="stat-card stat-purple" onclick="showScreen(7)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-solid fa-bullhorn"></i></div>
+                <div class="stat-label">Announcements</div>
+              </div>
+              <div class="stat-number">3</div>
+            </div>
+          </div>
+
+          <!-- Role-Specific Action Grid (Admin / Teacher) -->
+          <div id="dashRoleActions"></div>
+
+          <!-- Role-Specific Custom Content (e.g. Registered Ward for Parent, School Overview for Admin) -->
+          <div id="dashRoleContent"></div>
+
+          <!-- Recent Announcements -->
+          <div class="section-header">
+            <div class="section-title">Recent Announcements</div>
+            <span class="view-all-link" onclick="showScreen(7)">View All</span>
+          </div>
+          <div id="dashRecentNotices"></div>
+
+          <!-- Upcoming Homework -->
+          <div class="section-header" style="margin-top: 20px;">
+            <div class="section-title">Upcoming Homework</div>
+            <span class="view-all-link" onclick="showScreen(5)">View All</span>
+          </div>
+          <div id="dashUpcomingHW"></div>
+        </div>
+      </div>
+
+      <!-- SCREEN 3: CLASSES -->
+      <div class="screen-view" id="screen3">
+        <div class="dashboard-pad">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+            <div>
+              <div class="page-title">My Classes</div>
+              <div class="page-subtitle" style="margin-bottom: 0;">Classes assigned to you</div>
+            </div>
+            <button class="btn-add" id="addClassBtn" onclick="openAddClassModal()"><i class="fa-solid fa-plus"></i> Add Class</button>
+          </div>
+
+          <div id="classesList">
+            <!-- Dynamically populated from localStorage -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD / EDIT CLASS MODAL -->
+      <div class="modal-overlay" id="addClassModal" onclick="handleModalBgClick(event)">
+        <div class="modal-card" id="addClassCard">
+          <div class="modal-title" id="addClassModalTitle">Add New Class</div>
+
+          <div class="modal-field">
+            <div class="modal-label">Class Name</div>
+            <input class="modal-input" id="acClassName" type="text" placeholder="e.g. Grade 7" autocomplete="off">
+            <div class="modal-error" id="acClassNameErr">Class Name is required.</div>
+          </div>
+
+          <div class="modal-field">
+            <div class="modal-label">Section</div>
+            <input class="modal-input" id="acSection" type="text" placeholder="e.g. A" maxlength="5" autocomplete="off">
+            <div class="modal-error" id="acSectionErr">Section is required.</div>
+          </div>
+
+          <div class="modal-field">
+            <div class="modal-label">Academic Year</div>
+            <input class="modal-input" id="acAcadYear" type="text" placeholder="e.g. 2026-27" autocomplete="off">
+            <div class="modal-error" id="acAcadYearErr">Academic Year is required.</div>
+          </div>
+
+          <div class="modal-actions">
+            <button class="modal-btn-cancel" onclick="closeAddClassModal()">Cancel</button>
+            <button class="modal-btn-submit" id="acSubmitBtn" onclick="submitAddClass()">Add Class</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD STUDENT MODAL -->
+      <div class="modal-overlay" id="addStudentModal" onclick="handleStudentModalBgClick(event)">
+        <div class="modal-card" id="addStudentCard">
+          <div class="modal-title">Add New Student</div>
+
+          <div class="modal-field">
+            <div class="modal-label">Student Name *</div>
+            <input class="modal-input" id="astName" type="text" placeholder="e.g. Aarav Kumar" autocomplete="off">
+            <div class="modal-error" id="astNameErr">Student Name is required.</div>
+          </div>
+
+          <div class="modal-field">
+            <div class="modal-label">Admission Number *</div>
+            <input class="modal-input" id="astAdmNo" type="text" placeholder="e.g. ADM006" autocomplete="off">
+            <div class="modal-error" id="astAdmNoErr">Admission Number is required.</div>
+          </div>
+
+          <div class="modal-field">
+            <div class="modal-label">Class *</div>
+            <select class="modal-input" id="astClassSelect"></select>
+            <div class="modal-error" id="astClassErr">Please select a class.</div>
+          </div>
+
+          <div class="modal-actions">
+            <button class="modal-btn-cancel" onclick="closeAddStudentModal()">Cancel</button>
+            <button class="modal-btn-submit" onclick="submitAddStudent()">Add Student</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD ANNOUNCEMENT MODAL -->
+      <div class="modal-overlay" id="addAnnouncementModal" onclick="handleAnnouncementModalBgClick(event)">
+        <div class="modal-card" id="addAnnouncementCard">
+          <div class="modal-title">New Announcement</div>
+
+          <div class="modal-field">
+            <div class="modal-label">Title *</div>
+            <input class="modal-input" id="annTitleInput" type="text" placeholder="e.g. Annual Sports Day" autocomplete="off">
+            <div class="modal-error" id="annTitleErr">Title is required.</div>
+          </div>
+
+          <div class="modal-field">
+            <div class="modal-label">Audience *</div>
+            <select class="modal-input" id="annTypeSelect">
+              <option value="school">School (All Students & Parents)</option>
+              <option value="class">Specific Class</option>
+              <option value="parents">Parents Only</option>
+            </select>
+          </div>
+
+          <div class="modal-field">
+            <div class="modal-label">Priority *</div>
+            <select class="modal-input" id="annPrioritySelect">
+              <option value="normal">Normal</option>
+              <option value="important">Important</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+
+          <div class="modal-field">
+            <div class="modal-label">Content *</div>
+            <textarea class="modal-input" id="annContentInput" style="height: 70px; resize: vertical;" placeholder="Enter circular content..."></textarea>
+            <div class="modal-error" id="annContentErr">Content is required.</div>
+          </div>
+
+          <div class="modal-actions">
+            <button class="modal-btn-cancel" onclick="closeAddAnnouncementModal()">Cancel</button>
+            <button class="modal-btn-submit" onclick="submitAddAnnouncement()">Publish</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 4: STUDENTS -->
+      <div class="screen-view" id="screen4">
+        <div class="dashboard-pad">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+            <div>
+              <div class="page-title" id="studentsPageTitle">Students</div>
+              <div class="page-subtitle" id="studentsPageSubtitle" style="margin-bottom: 0;">Manage your students</div>
+            </div>
+            <button class="btn-add" id="addStudentBtn" onclick="openAddStudentModal()"><i class="fa-solid fa-plus"></i> Add Student</button>
+          </div>
+
+          <div class="search-row" id="studentSearchRow">
+            <div class="search-input-wrap">
+              <i class="fa-solid fa-magnifying-glass" style="color: #94a3b8; font-size: 13px;"></i>
+              <input type="text" placeholder="Search by name or admission number..." id="studentSearch" oninput="filterStudents()">
+            </div>
+            <div class="filter-btn-square" onclick="showToast('Filter options active')"><i class="fa-solid fa-sliders"></i></div>
+          </div>
+
+          <div class="chips-row" id="studentClassChips">
+            <!-- Dynamically populated from classes in localStorage -->
+          </div>
+
+          <div id="studentsList">
+            <!-- Dynamically rendered from localStorage -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 5: HOMEWORK -->
+      <div class="screen-view" id="screen5">
+        <div class="dashboard-pad">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+            <div>
+              <div class="page-title" id="hwPageTitle">Homework</div>
+              <div class="page-subtitle" id="hwPageSubtitle" style="margin-bottom: 0;">Create and manage homework assignments</div>
+            </div>
+            <button class="btn-add" id="addHwBtn" onclick="openCreateHomeworkScreen()"><i class="fa-solid fa-plus"></i> Add Homework</button>
+          </div>
+
+          <div class="chips-row">
+            <div class="chip active" onclick="filterHW(this, 'all')">All</div>
+            <div class="chip" onclick="filterHW(this, 'upcoming')">Upcoming</div>
+            <div class="chip" onclick="filterHW(this, 'overdue')">Overdue</div>
+          </div>
+
+          <div id="hwList">
+            <!-- Dynamically rendered from localStorage -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 6: CREATE HOMEWORK FORM -->
+      <div class="screen-view" id="screen6">
+        <div style="height: 52px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 16px; gap: 12px;">
+          <i class="fa-solid fa-arrow-left" style="font-size: 18px; color: #0f172a; cursor: pointer;" onclick="showScreen(5)"></i>
+          <span style="font-size: 16px; font-weight: 800; color: #0f172a;">Create Homework</span>
+        </div>
+        <div class="form-pad">
+          <label class="form-label">Class *</label>
+          <select class="select-box" id="hwClassSelect"></select>
+
+          <label class="form-label">Subject *</label>
+          <select class="select-box" id="hwSubjectSelect">
+            <option value="Mathematics">Mathematics</option>
+            <option value="Science">Science</option>
+            <option value="English">English</option>
+            <option value="Social Science">Social Science</option>
+          </select>
+
+          <label class="form-label">Title *</label>
+          <input type="text" class="select-box" id="hwTitleInput" placeholder="e.g. Chapter 5 - Problem Set">
+
+          <label class="form-label">Description *</label>
+          <textarea class="textarea-box" id="hwDescInput" placeholder="Enter instructions...">Complete the exercises 1 to 10. Show your working steps clearly.</textarea>
+
+          <label class="form-label">Due Date *</label>
+          <input type="date" class="select-box" id="hwDueDateInput" value="2025-08-30">
+
+          <label class="form-label">Attachment (Optional)</label>
+          <div class="upload-zone" onclick="showToast('File selected: assignment_sheet.pdf')">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <span>Tap to upload</span>
+            <small>PDF, JPG, PNG (Max 10MB)</small>
+          </div>
+
+          <button class="btn-primary" onclick="submitCreateHomework()">
+            Create Homework
+          </button>
+        </div>
+      </div>
+
+      <!-- SCREEN 7: ANNOUNCEMENTS -->
+      <div class="screen-view" id="screen7">
+        <div class="dashboard-pad">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+            <div>
+              <div class="page-title" id="annPageTitle">Announcements</div>
+              <div class="page-subtitle" id="annPageSubtitle" style="margin-bottom: 0;">School circulars and notices</div>
+            </div>
+            <button class="btn-add" id="addAnnBtn" onclick="openAddAnnouncementModal()"><i class="fa-solid fa-plus"></i> Add Announcement</button>
+          </div>
+
+          <div class="chips-row">
+            <div class="chip active" onclick="filterNotice(this, 'all')">All</div>
+            <div class="chip" onclick="filterNotice(this, 'school')">School</div>
+            <div class="chip" onclick="filterNotice(this, 'class')">Class</div>
+            <div class="chip" onclick="filterNotice(this, 'parents')">Parents</div>
+          </div>
+
+          <div id="noticesList">
+            <!-- Dynamically rendered from localStorage -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 8: ANNOUNCEMENT DETAIL -->
+      <div class="screen-view" id="screen8">
+        <div style="height: 52px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 16px; gap: 12px;">
+          <i class="fa-solid fa-arrow-left" style="font-size: 18px; color: #0f172a; cursor: pointer;" onclick="showScreen(7)"></i>
+          <span style="font-size: 16px; font-weight: 800; color: #0f172a;">Announcement Details</span>
+        </div>
+        <div class="detail-pad">
+          <div class="badge badge-urgent" id="detailBadge" style="display: inline-block; margin-bottom: 10px;">URGENT</div>
+          <div class="detail-title" id="detailTitle">Exam Schedule Released</div>
+
+          <div class="meta-row">
+            <i class="fa-regular fa-calendar" style="color: #94a3b8;"></i>
+            <span id="detailDate">Aug 25, 2025 • 10:30 AM</span>
+          </div>
+          <div class="meta-row">
+            <i class="fa-solid fa-user-group" style="color: #94a3b8;"></i>
+            <span id="detailTarget">For Grade 5 - A</span>
+          </div>
+
+          <div class="detail-body" id="detailBody">
+            Dear Students and Parents,<br><br>
+            The final exam schedule for Grade 5 - A has been released. Please check the attached timetable and make the necessary preparations.<br><br>
+            Best regards,<br>
+            School Administration
+          </div>
+
+          <div class="attachment-box">
+            <div class="pdf-icon"><i class="fa-regular fa-file-pdf"></i></div>
+            <div style="flex: 1;">
+              <div style="font-size: 13px; font-weight: 700; color: #0f172a;">exam_schedule.pdf</div>
+              <div style="font-size: 11px; color: #94a3b8;">2.4 MB</div>
+            </div>
+            <i class="fa-solid fa-download" style="color: #2563eb; font-size: 18px; cursor: pointer;" onclick="showToast('Downloading exam_schedule.pdf...')"></i>
+          </div>
+
+          <div class="author-footer">
+            <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100" style="width: 28px; height: 28px; border-radius: 50%;" alt="Avatar">
+            <span>Posted by: <strong>Priya Sharma (Teacher)</strong></span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    
+    <!-- PROFILE MODAL -->
+    <div class="modal-overlay" id="profileModal" onclick="handleProfileModalBgClick(event)">
+      <div class="modal-card" id="profileModalCard" style="max-width: 330px; text-align: center; padding: 24px 20px;">
+        <div style="width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 12px; overflow: hidden; border: 3px solid #3b82f6; box-shadow: 0 4px 10px rgba(37,99,235,0.2);">
+          <img id="modalProfileImg" src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>
+        <div id="modalProfileName" style="font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 2px;">Priya Sharma</div>
+        <div id="modalProfileRoleBadge" style="display: inline-block; padding: 3px 10px; font-size: 11px; font-weight: 700; border-radius: 12px; background: #eff6ff; color: #2563eb; margin-bottom: 16px;">Teacher</div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; text-align: left; font-size: 12px; color: #475569; margin-bottom: 18px; line-height: 1.6;">
+          <div><strong>Role:</strong> <span id="modalProfileRole">Teacher</span></div>
+          <div><strong>Designation:</strong> <span id="modalProfileDesig">Class Teacher</span></div>
+          <div><strong>Mobile:</strong> <span id="modalProfileMobile">+91 9876543210</span></div>
+          <div><strong>School:</strong> St. Xavier's International School</div>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <button class="modal-btn-cancel" style="flex: 1;" onclick="closeProfileModal()">Close</button>
+          <button class="modal-btn-submit" style="flex: 1; background: #ef4444;" onclick="closeProfileModal(); handleLogout();">
+            <i class="fa-solid fa-right-from-bracket"></i> Logout
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-nav" id="bottomNav">
+      <!-- Populated dynamically by renderRoleNavigation() -->
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toastBox"><i class="fa-solid fa-check"></i> <span id="toastMsg">Ready</span></div>
+  </div>
+
+  <script>
+
+    /* ==========================================================================
+       SECTION A: AUTHENTICATION STATE & RBAC DATA (PROTOTYPE)
+       ========================================================================== */
+    let authState = {
+      flow: 'signin', // 'signin' | 'register' | 'forgot'
+      mobile: '',
+      role: '', // 'Admin' | 'Teacher' | 'Parent'
+      schoolCode: '',
+      userName: '',
+      isAuthenticated: false,
+      timerInterval: null,
+      timerSeconds: 60,
+      validOTP: '123456'
+    };
+
+    /* ── Role Permissions Matrix ── */
+    function canAccess(screen, role) {
+      const s = parseInt(screen);
+      // Public / Auth screens are accessible during authentication flows
+      if ([1, 9, 10, 11, 12, 13].includes(s)) return true;
+
+      // Unauthenticated state default: allow previewing
+      if (!role) return true;
+
+      if (role === 'Admin') {
+        // Admin can access all management screens
+        return [2, 3, 4, 5, 6, 7, 8].includes(s);
+      }
+      if (role === 'Teacher') {
+        // Teacher can access assigned classes, students, homework, notices
+        return [2, 3, 4, 5, 6, 7, 8].includes(s);
+      }
+      if (role === 'Parent') {
+        // Parent:
+        // Screen 2 (Dashboard) -> YES
+        // Screen 4 (My Children / Students view) -> YES (Read-Only)
+        // Screen 5 (Homework view) -> YES (Read-Only)
+        // Screen 7 (Notices view) -> YES (Read-Only)
+        // Screen 8 (Notice Detail) -> YES (Read-Only)
+        // Screen 3 (Classes management) -> NO (Access Denied)
+        // Screen 6 (Create Homework) -> NO (Access Denied)
+        if (s === 3) return false;
+        if (s === 6) return false;
+        return [2, 4, 5, 7, 8].includes(s);
+      }
+      return true;
+    }
+
+    /* ── Centralized Role Navigation Matrix ── */
+    function getNavigationForRole(role) {
+      if (role === 'Admin') {
+        return [
+          { id: 'tabHome', screen: 2, label: 'Dashboard', icon: 'fa-solid fa-house' },
+          { id: 'tabClasses', screen: 3, label: 'Classes', icon: 'fa-solid fa-door-open' },
+          { id: 'tabStudents', screen: 4, label: 'Students', icon: 'fa-solid fa-user-group' },
+          { id: 'tabHW', screen: 5, label: 'Homework', icon: 'fa-regular fa-file-lines' },
+          { id: 'tabAnn', screen: 7, label: 'Announcements', icon: 'fa-solid fa-bullhorn' }
+        ];
+      }
+      if (role === 'Teacher') {
+        return [
+          { id: 'tabHome', screen: 2, label: 'Dashboard', icon: 'fa-solid fa-house' },
+          { id: 'tabClasses', screen: 3, label: 'My Classes', icon: 'fa-solid fa-door-open' },
+          { id: 'tabStudents', screen: 4, label: 'Students', icon: 'fa-solid fa-user-group' },
+          { id: 'tabHW', screen: 5, label: 'Homework', icon: 'fa-regular fa-file-lines' },
+          { id: 'tabAnn', screen: 7, label: 'Announcements', icon: 'fa-solid fa-bullhorn' }
+        ];
+      }
+      if (role === 'Parent') {
+        return [
+          { id: 'tabHome', screen: 2, label: 'Dashboard', icon: 'fa-solid fa-house' },
+          { id: 'tabChildren', screen: 4, label: 'My Children', icon: 'fa-solid fa-child' },
+          { id: 'tabHW', screen: 5, label: 'Homework', icon: 'fa-regular fa-file-lines' },
+          { id: 'tabAnn', screen: 7, label: 'Announcements', icon: 'fa-solid fa-bullhorn' },
+          { id: 'tabProfile', screen: 2, label: 'Profile', icon: 'fa-solid fa-user', action: 'showProfile' }
+        ];
+      }
+      // Fallback
+      return [
+        { id: 'tabHome', screen: 2, label: 'Home', icon: 'fa-solid fa-house' },
+        { id: 'tabClasses', screen: 3, label: 'Classes', icon: 'fa-solid fa-door-open' },
+        { id: 'tabStudents', screen: 4, label: 'Students', icon: 'fa-solid fa-user-group' },
+        { id: 'tabHW', screen: 5, label: 'Homework', icon: 'fa-regular fa-file-lines' },
+        { id: 'tabAnn', screen: 7, label: 'Notices', icon: 'fa-solid fa-bars' }
+      ];
+    }
+
+    function getDrawerItemsForRole(role) {
+      if (role === 'Admin') {
+        return [
+          { screen: 2, label: 'Dashboard', icon: 'fa-solid fa-house' },
+          { screen: 3, label: 'Classes', icon: 'fa-solid fa-door-open' },
+          { screen: 4, label: 'Students', icon: 'fa-solid fa-user-group' },
+          { action: 'teachers', label: 'Teachers', icon: 'fa-solid fa-chalkboard-user' },
+          { screen: 5, label: 'Homework', icon: 'fa-solid fa-book-open' },
+          { screen: 7, label: 'Announcements', icon: 'fa-solid fa-bullhorn' },
+          { action: 'notifications', label: 'Notifications', icon: 'fa-solid fa-bell' },
+          { action: 'profile', label: 'Profile', icon: 'fa-solid fa-user' },
+          { action: 'logout', label: 'Logout', icon: 'fa-solid fa-right-from-bracket', isLogout: true }
+        ];
+      }
+      if (role === 'Teacher') {
+        return [
+          { screen: 2, label: 'Dashboard', icon: 'fa-solid fa-house' },
+          { screen: 3, label: 'My Classes', icon: 'fa-solid fa-door-open' },
+          { screen: 4, label: 'Students', icon: 'fa-solid fa-user-group' },
+          { screen: 5, label: 'Homework', icon: 'fa-solid fa-book-open' },
+          { screen: 7, label: 'Announcements', icon: 'fa-solid fa-bullhorn' },
+          { action: 'notifications', label: 'Notifications', icon: 'fa-solid fa-bell' },
+          { action: 'profile', label: 'Profile', icon: 'fa-solid fa-user' },
+          { action: 'logout', label: 'Logout', icon: 'fa-solid fa-right-from-bracket', isLogout: true }
+        ];
+      }
+      if (role === 'Parent') {
+        return [
+          { screen: 2, label: 'Dashboard', icon: 'fa-solid fa-house' },
+          { screen: 4, label: 'My Children', icon: 'fa-solid fa-child' },
+          { screen: 5, label: 'Homework', icon: 'fa-solid fa-book-open' },
+          { screen: 7, label: 'Announcements', icon: 'fa-solid fa-bullhorn' },
+          { action: 'notifications', label: 'Notifications', icon: 'fa-solid fa-bell' },
+          { action: 'profile', label: 'Profile', icon: 'fa-solid fa-user' },
+          { action: 'logout', label: 'Logout', icon: 'fa-solid fa-right-from-bracket', isLogout: true }
+        ];
+      }
+      return [];
+    }
+
+    function renderRoleNavigation(role) {
+      const activeRole = role || authState.role || 'Teacher';
+      
+      // 1. Render Bottom Navigation
+      const bottomNav = document.getElementById('bottomNav');
+      if (bottomNav) {
+        const navItems = getNavigationForRole(activeRole);
+        bottomNav.innerHTML = navItems.map(item => {
+          if (item.action === 'showProfile') {
+            return `<div class="nav-item" id="${item.id}" onclick="openProfileModal()"><i class="${item.icon}"></i><span>${item.label}</span></div>`;
+          }
+          return `<div class="nav-item" id="${item.id}" onclick="showScreen(${item.screen})"><i class="${item.icon}"></i><span>${item.label}</span></div>`;
+        }).join('');
+      }
+
+      // 2. Render Side Drawer Items
+      const drawerContainer = document.getElementById('drawerNavItems');
+      if (drawerContainer) {
+        const drawerItems = getDrawerItemsForRole(activeRole);
+        drawerContainer.innerHTML = drawerItems.map(item => {
+          if (item.action === 'logout') {
+            return `<div class="drawer-item drawer-logout" onclick="handleLogout()"><i class="${item.icon}"></i> ${item.label}</div>`;
+          }
+          if (item.action === 'profile') {
+            return `<div class="drawer-item" onclick="toggleDrawer(); openProfileModal()"><i class="${item.icon}"></i> ${item.label}</div>`;
+          }
+          if (item.action === 'notifications') {
+            return `<div class="drawer-item" onclick="toggleDrawer(); showToast('${activeRole} Notifications: All caught up!')"><i class="${item.icon}"></i> ${item.label}</div>`;
+          }
+          if (item.action === 'teachers') {
+            return `<div class="drawer-item" onclick="toggleDrawer(); showToast('Faculty Directory: 12 Teachers Active')"><i class="${item.icon}"></i> ${item.label}</div>`;
+          }
+          return `<div class="drawer-item" onclick="showScreen(${item.screen}); toggleDrawer()"><i class="${item.icon}"></i> ${item.label}</div>`;
+        }).join('');
+      }
+    }
+
+    /* ── Screen Navigation with RBAC Permission Guarding ── */
+    // DEVELOPMENT PREVIEW CONTROL ONLY
+    // Production navigation must always use role permissions.
+    function devPreviewScreen(num) {
+      if (authState.isAuthenticated && !canAccess(num, authState.role)) {
+        showToast(`Access denied. Role '${authState.role}' cannot access this screen.`);
+        showScreen(2, true);
+        return;
+      }
+      showScreen(num, true);
+    }
+
+    function showScreen(num, isDevOverride = false) {
+      const activeRole = authState.role || (loadData('schoolconnect_auth', {}).role) || '';
+
+      // Guard RBAC permissions when authenticated
+      if (!isDevOverride && authState.isAuthenticated && activeRole && !canAccess(num, activeRole)) {
+        showToast(`Access denied. Role '${activeRole}' cannot access this screen.`);
+        showScreen(2, true);
+        return;
+      }
+
+      // Hide all screens
+      document.querySelectorAll('.screen-view').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.screen-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+      // Show selected screen
+      const screen = document.getElementById('screen' + num);
+      if (screen) screen.classList.add('active');
+
+      const btn = document.querySelectorAll('.screen-btn')[num - 1];
+      if (btn) btn.classList.add('active');
+
+      // Standalone / Auth screens: Hide common app bar and bottom navigation
+      const standaloneScreens = [1, 6, 8, 9, 10, 11, 12, 13];
+      const header = document.getElementById('commonHeader');
+      const bottomNav = document.getElementById('bottomNav');
+
+      if (standaloneScreens.includes(num)) {
+        if (header) header.style.display = 'none';
+        if (bottomNav) bottomNav.style.display = 'none';
+      } else {
+        if (header) header.style.display = 'flex';
+        if (bottomNav) bottomNav.style.display = 'flex';
+      }
+
+      // Sync Bottom Nav Active State
+      if (num === 2) document.getElementById('tabHome')?.classList.add('active');
+      if (num === 3) document.getElementById('tabClasses')?.classList.add('active');
+      if (num === 4) {
+        document.getElementById('tabStudents')?.classList.add('active');
+        document.getElementById('tabChildren')?.classList.add('active');
+      }
+      if (num === 5) document.getElementById('tabHW')?.classList.add('active');
+      if (num === 7) document.getElementById('tabAnn')?.classList.add('active');
+
+      // Refresh dynamic UI views upon entering screens
+      if (num === 2) updateDashboardStats();
+      if (num === 3) renderClassesUI();
+      if (num === 4) renderStudentsUI();
+      if (num === 5) renderHomeworkUI();
+      if (num === 7) renderAnnouncementsUI();
+      if (num === 9) setTimeout(() => document.getElementById('otp1')?.focus(), 150);
+
+      document.querySelector('.screen-content')?.scrollTo(0, 0);
+    }
+
+    /* ── Helper: Format Masked Mobile Number ── */
+    function maskMobile(num) {
+      if (!num || num.length < 10) return '+91 98••••••10';
+      const clean = num.replace(/\D/g, '');
+      return `+91 ${clean.slice(0, 2)}••••••${clean.slice(-2)}`;
+    }
+
+    /* ── Password Visibility Toggle Helper ── */
+    function togglePasswordVisibility(inputId, iconId) {
+      const input = document.getElementById(inputId);
+      const icon = document.getElementById(iconId);
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        if (icon) {
+          icon.classList.remove('fa-eye');
+          icon.classList.add('fa-eye-slash');
+        }
+      } else {
+        input.type = 'password';
+        if (icon) {
+          icon.classList.remove('fa-eye-slash');
+          icon.classList.add('fa-eye');
+        }
+      }
+    }
+
+    /* ── Profile Modal & Logout ── */
+    function openProfileModal() {
+      const modal = document.getElementById('profileModal');
+      if (!modal) return;
+      
+      const role = authState.role || 'Teacher';
+      const name = authState.userName || (role === 'Admin' ? 'Admin' : role === 'Parent' ? 'Ravi Kumar' : 'Priya Sharma');
+      const mobile = authState.mobile || (role === 'Admin' ? '9000000001' : role === 'Parent' ? '9000000002' : '9876543210');
+      const desig = role === 'Admin' ? 'School Administrator' : role === 'Parent' ? 'Parent of Aarav Kumar (Grade 5-A)' : 'Class Teacher (Grade 5-A)';
+      
+      const avatarUrl = role === 'Admin' 
+        ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100'
+        : role === 'Parent'
+        ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100'
+        : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100';
+
+      document.getElementById('modalProfileImg').src = avatarUrl;
+      document.getElementById('modalProfileName').textContent = name;
+      document.getElementById('modalProfileRoleBadge').textContent = role;
+      document.getElementById('modalProfileRole').textContent = role;
+      document.getElementById('modalProfileDesig').textContent = desig;
+      document.getElementById('modalProfileMobile').textContent = `+91 ${mobile}`;
+
+      const badge = document.getElementById('modalProfileRoleBadge');
+      badge.className = 'role-badge-' + role.toLowerCase();
+
+      modal.classList.add('open');
+    }
+
+    function closeProfileModal() {
+      document.getElementById('profileModal')?.classList.remove('open');
+    }
+
+    function handleProfileModalBgClick(e) {
+      if (e.target.id === 'profileModal') closeProfileModal();
+    }
+
+    /* ── Logout Handler ── */
+    function handleLogout() {
+      authState.isAuthenticated = false;
+      authState.role = '';
+      authState.userName = '';
+      authState.mobile = '';
+      clearInterval(authState.timerInterval);
+
+      // Clear prototype authentication session only (leave school data intact)
+      removeData('schoolconnect_auth');
+
+      // Reset form fields
+      if (document.getElementById('siMobile')) document.getElementById('siMobile').value = '';
+      if (document.getElementById('loginUser')) document.getElementById('loginUser').value = '';
+      if (document.getElementById('loginPass')) document.getElementById('loginPass').value = '';
+      if (document.getElementById('siSendOtpBtn')) document.getElementById('siSendOtpBtn').disabled = true;
+      if (document.getElementById('loginSubmitBtn')) document.getElementById('loginSubmitBtn').disabled = true;
+
+      document.getElementById('drawerOverlay')?.classList.remove('open');
+      closeProfileModal();
+      showToast('Logged out successfully');
+      showScreen(1, true); // Go back to Sign In
+    }
+
+    /* ── SCREEN 1: SIGN IN HANDLERS (PASSWORD & OTP) ── */
+    function handleSiMobileInput(input) {
+      input.value = input.value.replace(/\D/g, '');
+      const btn = document.getElementById('siSendOtpBtn');
+      const err = document.getElementById('siMobileErr');
+      const wrap = document.getElementById('siMobileWrap');
+
+      if (input.value.length === 10) {
+        btn.disabled = false;
+        err.classList.remove('show');
+        wrap.classList.remove('error');
+      } else {
+        btn.disabled = true;
+      }
+    }
+
+    function togglePasswordPanel() {
+      const panel = document.getElementById('passwordPanel');
+      const btnText = document.getElementById('togglePassBtnText');
+      panel.classList.toggle('open');
+      if (panel.classList.contains('open')) {
+        btnText.textContent = 'Hide Password Option';
+      } else {
+        btnText.textContent = 'Sign in with Password';
+      }
+    }
+
+    function handlePasswordInputs() {
+      const user = document.getElementById('loginUser').value.trim();
+      const pass = document.getElementById('loginPass').value.trim();
+      const btn = document.getElementById('loginSubmitBtn');
+      btn.disabled = !(user && pass);
+      document.getElementById('siPassErr').classList.remove('show');
+    }
+
+    function initiateSignInOtp() {
+      const mobileInput = document.getElementById('siMobile');
+      const val = mobileInput.value.trim();
+      if (val.length !== 10) {
+        document.getElementById('siMobileErr').classList.add('show');
+        document.getElementById('siMobileWrap').classList.add('error');
+        return;
+      }
+
+      authState.flow = 'signin';
+      authState.mobile = val;
+
+      const btn = document.getElementById('siSendOtpBtn');
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Sending OTP...</span>';
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+        prepareOtpScreen();
+        showScreen(9);
+        showToast('Verification code sent: 123456');
+      }, 500);
+    }
+
+    /* ── Password Authentication Determining Role ── */
+    function handlePasswordLogin() {
+      const user = document.getElementById('loginUser').value.trim();
+      const pass = document.getElementById('loginPass').value.trim();
+      const btn = document.getElementById('loginSubmitBtn');
+      const err = document.getElementById('siPassErr');
+
+      if (!user || !pass) {
+        err.textContent = 'Please enter both username and password';
+        err.classList.add('show');
+        return;
+      }
+
+      if (pass.length < 8) {
+        err.textContent = 'Password must be at least 8 characters.';
+        err.classList.add('show');
+        return;
+      }
+
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Signing In...</span>';
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+
+        const lowerUser = user.toLowerCase();
+        let role = '';
+        let name = '';
+        let mobile = '';
+
+        // Role 1: Admin
+        if (lowerUser === 'admin' || (pass === 'Admin@123' && lowerUser.includes('admin'))) {
+          role = 'Admin';
+          name = 'Admin';
+          mobile = '9000000001';
+        }
+        // Role 3: Parent
+        else if (lowerUser === 'parent_ravi' || lowerUser.includes('parent') || lowerUser.includes('ravi') || pass === 'Parent@123') {
+          role = 'Parent';
+          name = 'Ravi Kumar';
+          mobile = '9000000002';
+        }
+        // Role 2: Teacher
+        else if (lowerUser === 'teacher_priya' || lowerUser.includes('teacher') || lowerUser.includes('priya') || pass === 'Teacher@123') {
+          role = 'Teacher';
+          name = 'Priya Sharma';
+          mobile = '9876543210';
+        }
+        else {
+          // Default demo fallback for generic user
+          role = 'Teacher';
+          name = 'Priya Sharma';
+          mobile = '9876543210';
+        }
+
+        authState.isAuthenticated = true;
+        authState.role = role;
+        authState.userName = name;
+        authState.mobile = mobile;
+
+        // Persist prototype authentication session in localStorage
+        saveData('schoolconnect_auth', {
+          isAuthenticated: true,
+          role: role,
+          userName: name,
+          mobile: mobile
+        });
+
+        saveData('schoolconnect_profile', {
+          name: name,
+          role: role,
+          mobile: mobile
+        });
+
+        renderRoleDashboard(role, name);
+        renderRoleNavigation(role);
+        showToast(`Welcome back, ${name}! (${role} Dashboard)`);
+        showScreen(2);
+      }, 500);
+    }
+
+    function goToForgotPassword() {
+      const fpInput = document.getElementById('fpMobile');
+      if (fpInput) {
+        fpInput.value = '';
+        document.getElementById('fpSendOtpBtn').disabled = true;
+        document.getElementById('fpMobileErr').classList.remove('show');
+        document.getElementById('fpMobileWrap').classList.remove('error');
+      }
+      showScreen(11);
+    }
+
+    function goToRegister() {
+      document.getElementById('regSchoolCode').value = '';
+      document.getElementById('regMobile').value = '';
+      document.getElementById('regSendOtpBtn').disabled = true;
+      document.getElementById('regSchoolCodeErr').classList.remove('show');
+      document.getElementById('regMobileErr').classList.remove('show');
+      setRegRole('Teacher');
+      showScreen(10);
+    }
+
+    /* ── SCREEN 9: OTP VERIFICATION HANDLERS ── */
+    function prepareOtpScreen() {
+      document.getElementById('otpMaskedNumber').innerHTML = `<i class="fa-solid fa-mobile-screen"></i> ${maskMobile(authState.mobile)}`;
+      for (let i = 1; i <= 6; i++) {
+        const el = document.getElementById('otp' + i);
+        if (el) {
+          el.value = '';
+          el.classList.remove('error');
+        }
+      }
+      document.getElementById('otpErrorMsg').classList.remove('show');
+      document.getElementById('verifyOtpBtn').disabled = true;
+      startOtpTimer();
+    }
+
+    function startOtpTimer() {
+      clearInterval(authState.timerInterval);
+      authState.timerSeconds = 60;
+
+      const countdownEl = document.getElementById('otpCountdown');
+      const resendBtn = document.getElementById('resendOtpBtn');
+      const timerLabel = document.getElementById('otpTimerLabel');
+
+      resendBtn.disabled = true;
+      timerLabel.textContent = 'Resend OTP in ';
+      countdownEl.style.display = 'inline';
+      countdownEl.textContent = '00:60';
+
+      authState.timerInterval = setInterval(() => {
+        authState.timerSeconds--;
+        if (authState.timerSeconds <= 0) {
+          clearInterval(authState.timerInterval);
+          countdownEl.style.display = 'none';
+          timerLabel.textContent = '';
+          resendBtn.disabled = false;
+        } else {
+          const sec = authState.timerSeconds < 10 ? '0' + authState.timerSeconds : authState.timerSeconds;
+          countdownEl.textContent = `00:${sec}`;
+        }
+      }, 1000);
+    }
+
+    function resendOtpCode() {
+      const btn = document.getElementById('resendOtpBtn');
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resending...';
+
+      setTimeout(() => {
+        btn.innerHTML = origText;
+        prepareOtpScreen();
+        showToast('New OTP sent: 123456');
+      }, 500);
+    }
+
+    function onOtpDigitInput(input, index) {
+      input.value = input.value.replace(/\D/g, '');
+      document.getElementById('otpErrorMsg').classList.remove('show');
+      for (let i = 1; i <= 6; i++) {
+        document.getElementById('otp' + i)?.classList.remove('error');
+      }
+
+      if (input.value && index < 5) {
+        const next = document.getElementById('otp' + (index + 2));
+        if (next) next.focus();
+      }
+
+      checkOtpCompletion();
+    }
+
+    function onOtpDigitKeydown(input, e, index) {
+      document.getElementById('otpErrorMsg').classList.remove('show');
+      for (let i = 1; i <= 6; i++) {
+        document.getElementById('otp' + i)?.classList.remove('error');
+      }
+
+      if (e.key === 'Backspace') {
+        if (!input.value && index > 0) {
+          const prev = document.getElementById('otp' + index);
+          if (prev) {
+            prev.focus();
+            prev.value = '';
+          }
+        }
+        setTimeout(checkOtpCompletion, 10);
+      }
+    }
+
+    function handleOtpPaste(e) {
+      e.preventDefault();
+      const paste = (e.clipboardData || window.clipboardData).getData('text');
+      const clean = paste.replace(/\D/g, '').slice(0, 6);
+      if (!clean) return;
+
+      document.getElementById('otpErrorMsg').classList.remove('show');
+      for (let i = 0; i < 6; i++) {
+        const box = document.getElementById('otp' + (i + 1));
+        if (box) {
+          box.value = clean[i] || '';
+          box.classList.remove('error');
+        }
+      }
+
+      const lastFilledIndex = Math.min(clean.length, 6);
+      const targetBox = document.getElementById('otp' + lastFilledIndex);
+      if (targetBox) targetBox.focus();
+
+      checkOtpCompletion();
+    }
+
+    function checkOtpCompletion() {
+      let fullCode = '';
+      for (let i = 1; i <= 6; i++) {
+        const val = document.getElementById('otp' + i)?.value || '';
+        fullCode += val;
+      }
+      const verifyBtn = document.getElementById('verifyOtpBtn');
+      verifyBtn.disabled = fullCode.length !== 6;
+      return fullCode;
+    }
+
+    function verifyOtpCode() {
+      const code = checkOtpCompletion();
+      const btn = document.getElementById('verifyOtpBtn');
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Verifying...</span>';
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+
+        if (code === authState.validOTP) {
+          clearInterval(authState.timerInterval);
+          document.getElementById('otpErrorMsg').classList.remove('show');
+
+          if (authState.flow === 'signin') {
+            // Determine role by mobile number automatically without asking user
+            const mobile = authState.mobile || '';
+            let role = 'Teacher';
+            let name = 'Priya Sharma';
+
+            // Admin: 9000000001
+            if (mobile === '9000000001' || mobile.endsWith('00') || mobile === '9999999999' || mobile.includes('admin')) {
+              role = 'Admin';
+              name = 'Admin';
+            }
+            // Parent: 9000000002
+            else if (mobile === '9000000002' || mobile.endsWith('99') || mobile.includes('parent')) {
+              role = 'Parent';
+              name = 'Ravi Kumar';
+            }
+            // Teacher: 9876543210
+            else {
+              role = 'Teacher';
+              name = 'Priya Sharma';
+            }
+
+            authState.isAuthenticated = true;
+            authState.role = role;
+            authState.userName = name;
+
+            saveData('schoolconnect_auth', {
+              isAuthenticated: true,
+              role: role,
+              userName: name,
+              mobile: mobile
+            });
+
+            saveData('schoolconnect_profile', {
+              name: name,
+              role: role,
+              mobile: mobile
+            });
+
+            renderRoleDashboard(role, name);
+            renderRoleNavigation(role);
+            showToast(`Verification successful! Welcome ${name}`);
+            showScreen(2); // Go to role dashboard
+          } else if (authState.flow === 'register') {
+            showToast('Mobile verified! Complete your profile.');
+            prepareSetupScreen();
+            showScreen(13); // Go to Account Setup
+          } else if (authState.flow === 'forgot') {
+            showToast('Mobile verified! Set your new password.');
+            prepareResetPasswordScreen();
+            showScreen(12); // Go to Reset Password
+          }
+        } else {
+          const errMsg = document.getElementById('otpErrorMsg');
+          errMsg.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Invalid OTP. Please try again.';
+          errMsg.classList.add('show');
+          for (let i = 1; i <= 6; i++) {
+            document.getElementById('otp' + i)?.classList.add('error');
+          }
+        }
+      }, 500);
+    }
+
+    function handleOtpBack() {
+      clearInterval(authState.timerInterval);
+      if (authState.flow === 'register') {
+        showScreen(10);
+      } else if (authState.flow === 'forgot') {
+        showScreen(11);
+      } else {
+        showScreen(1);
+      }
+    }
+
+    /* ── SCREEN 10: REGISTER (SCHOOL CONTROLLED: TEACHER & PARENT ONLY) ── */
+    function isValidSchoolCode(code) {
+      if (!code) return false;
+      const clean = code.trim().toUpperCase();
+      return clean === 'SCH2025' || clean === 'BIZ101';
+    }
+
+    function setRegRole(role) {
+      if (role === 'Admin') return; // Admin registration is strictly prohibited
+      authState.role = role;
+      document.getElementById('roleCardParent').classList.toggle('active', role === 'Parent');
+      document.getElementById('roleCardTeacher').classList.toggle('active', role === 'Teacher');
+      validateRegisterForm();
+    }
+
+    function validateRegisterForm() {
+      const codeInput = document.getElementById('regSchoolCode');
+      const code = codeInput.value.trim().toUpperCase();
+      const mobileInput = document.getElementById('regMobile');
+      mobileInput.value = mobileInput.value.replace(/\D/g, '');
+      const mobile = mobileInput.value;
+
+      const codeErr = document.getElementById('regSchoolCodeErr');
+      const mobileErr = document.getElementById('regMobileErr');
+      const btn = document.getElementById('regSendOtpBtn');
+
+      const isCodeValid = isValidSchoolCode(code);
+      const isMobileValid = mobile.length === 10;
+      const isRoleValid = authState.role === 'Teacher' || authState.role === 'Parent';
+
+      if (code.length > 0 && !isCodeValid) {
+        codeErr.classList.add('show');
+      } else {
+        codeErr.classList.remove('show');
+      }
+
+      if (mobile.length > 0 && !isMobileValid) {
+        mobileErr.classList.add('show');
+      } else {
+        mobileErr.classList.remove('show');
+      }
+
+      btn.disabled = !(isCodeValid && isMobileValid && isRoleValid);
+    }
+
+    function initiateRegisterOtp() {
+      const code = document.getElementById('regSchoolCode').value.trim().toUpperCase();
+      const mobile = document.getElementById('regMobile').value.trim();
+
+      if (!isValidSchoolCode(code)) {
+        document.getElementById('regSchoolCodeErr').classList.add('show');
+        return;
+      }
+      if (mobile.length !== 10) {
+        document.getElementById('regMobileErr').classList.add('show');
+        return;
+      }
+
+      authState.flow = 'register';
+      authState.schoolCode = code;
+      authState.mobile = mobile;
+
+      const btn = document.getElementById('regSendOtpBtn');
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Sending OTP...</span>';
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+        prepareOtpScreen();
+        showScreen(9);
+        showToast('Registration OTP sent: 123456');
+      }, 500);
+    }
+
+    /* ── SCREEN 13: ACCOUNT SETUP (POST-REGISTRATION) ── */
+    function prepareSetupScreen() {
+      document.getElementById('setupConfirmedRole').textContent = authState.role;
+      document.getElementById('setupFullName').value = '';
+      document.getElementById('setupEmail').value = '';
+      document.getElementById('setupPass').value = '';
+      document.getElementById('setupConfirmPass').value = '';
+      document.getElementById('setupSubmitBtn').disabled = true;
+      document.getElementById('setupNameErr').classList.remove('show');
+      document.getElementById('setupPassErr').classList.remove('show');
+    }
+
+    function validateSetupForm() {
+      const name = document.getElementById('setupFullName').value.trim();
+      const pass = document.getElementById('setupPass').value;
+      const confirmPass = document.getElementById('setupConfirmPass').value;
+      const btn = document.getElementById('setupSubmitBtn');
+      const err = document.getElementById('setupPassErr');
+
+      let isPassValid = false;
+      if (!pass && !confirmPass) {
+        err.classList.remove('show');
+      } else if (pass.length > 0 && pass.length < 8) {
+        err.textContent = 'Password must be at least 8 characters.';
+        err.classList.add('show');
+      } else if (confirmPass.length > 0 && pass !== confirmPass) {
+        err.textContent = 'Passwords do not match.';
+        err.classList.add('show');
+      } else if (pass.length >= 8 && pass === confirmPass) {
+        err.classList.remove('show');
+        isPassValid = true;
+      }
+
+      btn.disabled = !(name.length > 0 && isPassValid);
+    }
+
+    function submitAccountSetup() {
+      const name = document.getElementById('setupFullName').value.trim();
+      const pass = document.getElementById('setupPass').value;
+      const confirmPass = document.getElementById('setupConfirmPass').value;
+      const err = document.getElementById('setupPassErr');
+
+      if (!name) {
+        document.getElementById('setupNameErr').classList.add('show');
+        return;
+      }
+      if (pass.length < 8) {
+        err.textContent = 'Password must be at least 8 characters.';
+        err.classList.add('show');
+        return;
+      }
+      if (pass !== confirmPass) {
+        err.textContent = 'Passwords do not match.';
+        err.classList.add('show');
+        return;
+      }
+
+      // Security: Admin role is never allowed in public registration
+      if (authState.role === 'Admin') {
+        authState.role = 'Teacher';
+      }
+
+      const registeredRole = authState.role || 'Teacher';
+
+      const btn = document.getElementById('setupSubmitBtn');
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Completing Setup...</span>';
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+
+        authState.isAuthenticated = true;
+        authState.role = registeredRole;
+        authState.userName = name;
+
+        saveData('schoolconnect_auth', {
+          isAuthenticated: true,
+          role: registeredRole,
+          userName: name,
+          mobile: authState.mobile
+        });
+
+        saveData('schoolconnect_profile', {
+          name: name,
+          role: registeredRole,
+          mobile: authState.mobile
+        });
+
+        renderRoleDashboard(registeredRole, name);
+        renderRoleNavigation(registeredRole);
+        showToast(`Account created! Welcome ${name}`);
+        showScreen(2);
+      }, 600);
+    }
+
+    function handleSetupBack() {
+      showScreen(9);
+    }
+
+    /* ── SCREEN 11: FORGOT PASSWORD HANDLERS ── */
+    function handleFpMobileInput(input) {
+      input.value = input.value.replace(/\D/g, '');
+      const btn = document.getElementById('fpSendOtpBtn');
+      const err = document.getElementById('fpMobileErr');
+      const wrap = document.getElementById('fpMobileWrap');
+
+      if (input.value.length === 10) {
+        btn.disabled = false;
+        err.classList.remove('show');
+        wrap.classList.remove('error');
+      } else {
+        btn.disabled = true;
+      }
+    }
+
+    function initiateForgotPassOtp() {
+      const mobile = document.getElementById('fpMobile').value.trim();
+      if (mobile.length !== 10) {
+        document.getElementById('fpMobileErr').classList.add('show');
+        document.getElementById('fpMobileWrap').classList.add('error');
+        return;
+      }
+
+      authState.flow = 'forgot';
+      authState.mobile = mobile;
+
+      const btn = document.getElementById('fpSendOtpBtn');
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Sending Reset OTP...</span>';
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+        prepareOtpScreen();
+        showScreen(9);
+        showToast('Password reset code sent: 123456');
+      }, 500);
+    }
+
+    /* ── SCREEN 12: RESET PASSWORD HANDLERS ── */
+    function prepareResetPasswordScreen() {
+      document.getElementById('resetNewPass').value = '';
+      document.getElementById('resetConfirmPass').value = '';
+      document.getElementById('resetSubmitBtn').disabled = true;
+      document.getElementById('resetPassErr').classList.remove('show');
+      document.getElementById('resetFormCard').style.display = 'block';
+      document.getElementById('resetSuccessCard').style.display = 'none';
+    }
+
+    function validateResetPasswordForm() {
+      const pass = document.getElementById('resetNewPass').value;
+      const confirmPass = document.getElementById('resetConfirmPass').value;
+      const btn = document.getElementById('resetSubmitBtn');
+      const err = document.getElementById('resetPassErr');
+
+      let isValid = false;
+      if (!pass && !confirmPass) {
+        err.classList.remove('show');
+      } else if (pass.length > 0 && pass.length < 8) {
+        err.textContent = 'Password must be at least 8 characters.';
+        err.classList.add('show');
+      } else if (confirmPass.length > 0 && pass !== confirmPass) {
+        err.textContent = 'Passwords do not match.';
+        err.classList.add('show');
+      } else if (pass.length >= 8 && pass === confirmPass) {
+        err.classList.remove('show');
+        isValid = true;
+      }
+
+      btn.disabled = !isValid;
+    }
+
+    function submitResetPassword() {
+      const pass = document.getElementById('resetNewPass').value;
+      const confirmPass = document.getElementById('resetConfirmPass').value;
+      const err = document.getElementById('resetPassErr');
+
+      if (pass.length < 8) {
+        err.textContent = 'Password must be at least 8 characters.';
+        err.classList.add('show');
+        return;
+      }
+      if (pass !== confirmPass) {
+        err.textContent = 'Passwords do not match.';
+        err.classList.add('show');
+        return;
+      }
+
+      const btn = document.getElementById('resetSubmitBtn');
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Updating Password...</span>';
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+        document.getElementById('resetFormCard').style.display = 'none';
+        document.getElementById('resetSuccessCard').style.display = 'block';
+        showToast('Password reset successful!');
+      }, 500);
+    }
+
+    function returnToSignInAfterReset() {
+      document.getElementById('loginUser').value = authState.mobile || '';
+      document.getElementById('loginPass').value = '';
+      showScreen(1);
+    }
+
+    /* ==========================================================================
+       SECTION B: LOCALSTORAGE PERSISTENCE DATA LAYER (CRASH-RESILIENT)
+       ========================================================================== */
+    function saveData(key, data) {
+      try {
+        localStorage.setItem(key, JSON.stringify(data));
+      } catch (err) {
+        console.error('Error saving data to localStorage key: ' + key, err);
+      }
+    }
+
+    function loadData(key, defaultValue = []) {
+      try {
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : defaultValue;
+      } catch (err) {
+        console.error('Corrupted JSON or error reading localStorage key: ' + key, err);
+        return defaultValue;
+      }
+    }
+
+    function removeData(key) {
+      try {
+        localStorage.removeItem(key);
+      } catch (err) {
+        console.error('Error removing localStorage key: ' + key, err);
+      }
+    }
+
+    function clearSchoolConnectData() {
+      const keys = [
+        'schoolconnect_classes',
+        'schoolconnect_students',
+        'schoolconnect_homework',
+        'schoolconnect_announcements',
+        'schoolconnect_profile',
+        'schoolconnect_settings',
+        'schoolconnect_auth'
+      ];
+      keys.forEach(k => removeData(k));
+      console.log('SchoolConnect localStorage cleared');
+    }
+
+    function resetPrototypeDemoData() {
+      if (confirm("Reset Prototype Data?\n\nThis will clear custom classes, students, homework, and reseed fresh demo data.")) {
+        clearSchoolConnectData();
+        window.location.reload();
+      }
+    }
+
+    function initSchoolConnectData() {
+      if (localStorage.getItem('schoolconnect_classes') === null) {
+        const defaultClasses = [
+          { id: "class_001", name: "Grade 5", section: "A", academicYear: "2026-27", createdAt: new Date().toISOString() },
+          { id: "class_002", name: "Grade 6", section: "B", academicYear: "2026-27", createdAt: new Date().toISOString() }
+        ];
+        saveData('schoolconnect_classes', defaultClasses);
+      }
+
+      if (localStorage.getItem('schoolconnect_students') === null) {
+        const defaultStudents = [
+          { id: "std_001", name: "Aarav Kumar", admissionNumber: "ADM001", classId: "class_001", createdAt: new Date().toISOString() },
+          { id: "std_002", name: "Diya Patel", admissionNumber: "ADM002", classId: "class_001", createdAt: new Date().toISOString() },
+          { id: "std_003", name: "Rohan Singh", admissionNumber: "ADM003", classId: "class_001", createdAt: new Date().toISOString() },
+          { id: "std_004", name: "Ananya Reddy", admissionNumber: "ADM004", classId: "class_001", createdAt: new Date().toISOString() },
+          { id: "std_005", name: "Vihaan Sharma", admissionNumber: "ADM005", classId: "class_001", createdAt: new Date().toISOString() }
+        ];
+        saveData('schoolconnect_students', defaultStudents);
+      }
+
+      if (localStorage.getItem('schoolconnect_homework') === null) {
+        const defaultHW = [
+          { id: "hw_001", classId: "class_001", subject: "Mathematics", title: "Mathematics - Chapter 5", description: "Solve textbook problems 1 to 10 on page 42.", assignedDate: "2025-08-20", dueDate: "2025-08-28", status: "overdue", createdAt: new Date().toISOString() },
+          { id: "hw_002", classId: "class_002", subject: "Science", title: "Science - Plants and Animals", description: "Draw life cycle diagram of a flowering plant.", assignedDate: "2025-08-22", dueDate: "2025-08-30", status: "upcoming", createdAt: new Date().toISOString() },
+          { id: "hw_003", classId: "class_001", subject: "English", title: "English - Essay Writing", description: "Write an essay about My Favourite Teacher (200 words).", assignedDate: "2025-08-24", dueDate: "2025-09-02", status: "upcoming", createdAt: new Date().toISOString() },
+          { id: "hw_004", classId: "class_002", subject: "Social Science", title: "Social Science - Our Country", description: "Map reading exercises on Indian states and capitals.", assignedDate: "2025-08-25", dueDate: "2025-09-05", status: "upcoming", createdAt: new Date().toISOString() },
+          { id: "hw_005", classId: "class_001", subject: "Hindi", title: "Hindi - Varnamala & Grammar", description: "Practice worksheet exercises 1 to 5.", assignedDate: "2025-08-25", dueDate: "2025-09-04", status: "upcoming", createdAt: new Date().toISOString() }
+        ];
+        saveData('schoolconnect_homework', defaultHW);
+      }
+
+      if (localStorage.getItem('schoolconnect_announcements') === null) {
+        const defaultAnn = [
+          { id: "ann_001", title: "Exam Schedule Released", content: "Dear Students and Parents,\n\nThe final exam schedule for Grade 5 - A has been released. Please check the timetable and prepare.", priority: "urgent", audienceType: "class", targetClassId: "class_001", date: "Aug 25, 2025", createdAt: new Date().toISOString() },
+          { id: "ann_002", title: "Annual Sports Day", content: "St. Xavier's International School is hosting the Annual Sports Meet on Sept 15. All parents are warmly invited to attend.", priority: "important", audienceType: "school", targetClassId: null, date: "Aug 22, 2025", createdAt: new Date().toISOString() },
+          { id: "ann_003", title: "PTA Meeting", content: "The Parent-Teacher Association meeting for term 1 will be held this Saturday at 10:00 AM in the school auditorium.", priority: "normal", audienceType: "parents", targetClassId: null, date: "Aug 20, 2025", createdAt: new Date().toISOString() },
+          { id: "ann_004", title: "Independence Day Celebration", content: "School celebration on August 15. Students should arrive in full uniform by 8:00 AM.", priority: "normal", audienceType: "school", targetClassId: null, date: "Aug 12, 2025", createdAt: new Date().toISOString() }
+        ];
+        saveData('schoolconnect_announcements', defaultAnn);
+      }
+
+      if (localStorage.getItem('schoolconnect_profile') === null) {
+        saveData('schoolconnect_profile', {
+          name: "Priya Sharma",
+          role: "Teacher",
+          mobile: "9876543210"
+        });
+      }
+
+      populateClassDropdowns();
+    }
+
+    /* ── Helper: Resolve Class Name ── */
+    function resolveClassName(classId) {
+      if (!classId) return 'General';
+      const classes = loadData('schoolconnect_classes', []);
+      const found = classes.find(c => c.id === classId || c.name === classId || (c.name + ' - ' + c.section) === classId || (c.name + c.section) === classId);
+      if (found) return `${found.name} - ${found.section}`;
+      return classId;
+    }
+
+    /* ==========================================================================
+       SECTION C: ROLE-SPECIFIC DASHBOARDS (ADMIN, TEACHER, PARENT)
+       ========================================================================== */
+    function renderRoleDashboard(role, name) {
+      const currentRole = role || authState.role || 'Teacher';
+      const roleName = name || authState.userName || (currentRole === 'Admin' ? 'Admin' : currentRole === 'Parent' ? 'Ravi Kumar' : 'Priya Sharma');
+
+      const classes = loadData('schoolconnect_classes', []);
+      const students = loadData('schoolconnect_students', []);
+      const homework = loadData('schoolconnect_homework', []);
+      const announcements = loadData('schoolconnect_announcements', []);
+
+      // 1. Update Common App Header Profile Chip
+      const headerName = document.getElementById('headerProfileName');
+      const headerRole = document.getElementById('headerProfileRole');
+      const headerAvatar = document.getElementById('headerAvatar');
+
+      if (headerName) headerName.textContent = roleName;
+      if (headerRole) headerRole.textContent = currentRole === 'Admin' ? 'Administrator' : currentRole;
+
+      if (headerAvatar) {
+        if (currentRole === 'Admin') {
+          headerAvatar.src = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100';
+        } else if (currentRole === 'Parent') {
+          headerAvatar.src = 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100';
+        } else {
+          headerAvatar.src = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100';
+        }
+      }
+
+      // 2. Update Dashboard Titles & Stats
+      const pageTitle = document.getElementById('dashPageTitle');
+      const pageSub = document.getElementById('dashPageSubtitle');
+      const statsGrid = document.getElementById('dashStatsGrid');
+      const roleActions = document.getElementById('dashRoleActions');
+      const roleContent = document.getElementById('dashRoleContent');
+
+      if (currentRole === 'Admin') {
+        if (pageTitle) pageTitle.textContent = 'Admin Dashboard';
+        if (pageSub) pageSub.textContent = "School Overview • St. Xavier's International School";
+
+        if (statsGrid) {
+          statsGrid.innerHTML = `
+            <div class="stat-card stat-green" onclick="showScreen(4)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-solid fa-users"></i></div>
+                <div class="stat-label">Total Students</div>
+              </div>
+              <div class="stat-number" id="dashNumStudents">${students.length}</div>
+            </div>
+            <div class="stat-card stat-cyan" onclick="showToast('Faculty Directory: 12 Faculty Members Active')">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-solid fa-chalkboard-user"></i></div>
+                <div class="stat-label">Total Teachers</div>
+              </div>
+              <div class="stat-number" id="dashNumTeachers">12</div>
+            </div>
+            <div class="stat-card stat-amber" onclick="showScreen(3)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-solid fa-door-open"></i></div>
+                <div class="stat-label">Total Classes</div>
+              </div>
+              <div class="stat-number" id="dashNumClasses">${classes.length}</div>
+            </div>
+            <div class="stat-card stat-purple" onclick="showScreen(7)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-solid fa-bullhorn"></i></div>
+                <div class="stat-label">Announcements</div>
+              </div>
+              <div class="stat-number" id="dashNumAnn">${announcements.length}</div>
+            </div>
+          `;
+        }
+
+        if (roleActions) {
+          roleActions.innerHTML = `
+            <div class="dash-quick-actions">
+              <button class="dash-action-btn" onclick="openAddClassModal()">
+                <div class="dash-action-icon" style="background: #eff6ff; color: #2563eb;"><i class="fa-solid fa-plus"></i></div>
+                <span>Add Class</span>
+              </button>
+              <button class="dash-action-btn" onclick="openAddStudentModal()">
+                <div class="dash-action-icon" style="background: #f0fdf4; color: #16a34a;"><i class="fa-solid fa-user-plus"></i></div>
+                <span>Add Student</span>
+              </button>
+              <button class="dash-action-btn" onclick="openAddAnnouncementModal()">
+                <div class="dash-action-icon" style="background: #faf5ff; color: #7c3aed;"><i class="fa-solid fa-bullhorn"></i></div>
+                <span>New Notice</span>
+              </button>
+              <button class="dash-action-btn" onclick="showScreen(5)">
+                <div class="dash-action-icon" style="background: #fffbeb; color: #d97706;"><i class="fa-solid fa-book"></i></div>
+                <span>All Homework</span>
+              </button>
+            </div>
+          `;
+        }
+
+        if (roleContent) {
+          roleContent.innerHTML = '';
+        }
+
+      } else if (currentRole === 'Parent') {
+        const parentFirst = roleName.split(' ')[0];
+        if (pageTitle) pageTitle.textContent = 'Parent Dashboard';
+        if (pageSub) pageSub.textContent = `My Child's Overview • Student: Aarav Kumar (Grade 5 - A)`;
+
+        // Filter assignments for child's class
+        const childClassId = 'class_001';
+        const childHW = homework.filter(h => h.classId === childClassId || (h.className && h.className.includes('5')));
+        const childNotices = announcements.filter(a => a.audienceType === 'parents' || a.audienceType === 'school' || a.targetClassId === childClassId);
+
+        if (statsGrid) {
+          statsGrid.innerHTML = `
+            <div class="stat-card stat-green" onclick="showScreen(4)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-solid fa-child"></i></div>
+                <div class="stat-label">My Children</div>
+              </div>
+              <div class="stat-number" id="dashNumChildren">1</div>
+            </div>
+            <div class="stat-card stat-amber" onclick="showScreen(5)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-regular fa-file-lines"></i></div>
+                <div class="stat-label">Pending HW</div>
+              </div>
+              <div class="stat-number" id="dashNumHW">${childHW.length}</div>
+            </div>
+            <div class="stat-card stat-cyan" onclick="showToast('Attendance: 96% Present (18/19 days this month)')">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-solid fa-calendar-check"></i></div>
+                <div class="stat-label">Attendance</div>
+              </div>
+              <div class="stat-number">96%</div>
+            </div>
+            <div class="stat-card stat-purple" onclick="showScreen(7)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><div class="fa-solid fa-bullhorn"></div></div>
+                <div class="stat-label">Notices</div>
+              </div>
+              <div class="stat-number" id="dashNumAnn">${childNotices.length}</div>
+            </div>
+          `;
+        }
+
+        if (roleActions) {
+          roleActions.innerHTML = ''; // Parents do not have administrative creation buttons
+        }
+
+        if (roleContent) {
+          roleContent.innerHTML = `
+            <div class="child-card">
+              <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100" class="child-avatar" alt="Aarav Kumar">
+              <div class="child-meta">
+                <div class="child-name">Aarav Kumar</div>
+                <div class="child-class">Grade 5 - A &bull; Roll #01 &bull; Class Teacher: Priya Sharma</div>
+                <span class="child-tag"><i class="fa-solid fa-award"></i> Academic Standing: Grade A (GPA 3.8)</span>
+              </div>
+            </div>
+          `;
+        }
+
+      } else {
+        // Teacher Dashboard
+        const teacherFirst = roleName.split(' ')[0];
+        if (pageTitle) pageTitle.textContent = 'Teacher Dashboard';
+        if (pageSub) pageSub.textContent = `My Teaching Overview • Welcome back, ${teacherFirst}!`;
+
+        if (statsGrid) {
+          statsGrid.innerHTML = `
+            <div class="stat-card stat-cyan" onclick="showScreen(3)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-regular fa-user"></i></div>
+                <div class="stat-label">My Classes</div>
+              </div>
+              <div class="stat-number" id="dashNumClasses">${classes.length}</div>
+            </div>
+            <div class="stat-card stat-green" onclick="showScreen(4)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-solid fa-users"></i></div>
+                <div class="stat-label">Total Students</div>
+              </div>
+              <div class="stat-number" id="dashNumStudents">${students.length}</div>
+            </div>
+            <div class="stat-card stat-amber" onclick="showScreen(5)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-regular fa-file-lines"></i></div>
+                <div class="stat-label">Homework</div>
+              </div>
+              <div class="stat-number" id="dashNumHW">${homework.length}</div>
+            </div>
+            <div class="stat-card stat-purple" onclick="showScreen(7)">
+              <div class="stat-top">
+                <div class="stat-icon-wrap"><i class="fa-solid fa-bullhorn"></i></div>
+                <div class="stat-label">Announcements</div>
+              </div>
+              <div class="stat-number" id="dashNumAnn">${announcements.length}</div>
+            </div>
+          `;
+        }
+
+        if (roleActions) {
+          roleActions.innerHTML = `
+            <div class="dash-quick-actions">
+              <button class="dash-action-btn" onclick="openCreateHomeworkScreen()">
+                <div class="dash-action-icon" style="background: #eff6ff; color: #2563eb;"><i class="fa-solid fa-plus"></i></div>
+                <span>Create Homework</span>
+              </button>
+              <button class="dash-action-btn" onclick="openAddAnnouncementModal()">
+                <div class="dash-action-icon" style="background: #faf5ff; color: #7c3aed;"><i class="fa-solid fa-bullhorn"></i></div>
+                <span>Post Notice</span>
+              </button>
+            </div>
+          `;
+        }
+
+        if (roleContent) {
+          roleContent.innerHTML = '';
+        }
+      }
+
+      // 3. Render Recent Announcements on Dashboard
+      const recentNoticesEl = document.getElementById('dashRecentNotices');
+      if (recentNoticesEl) {
+        let displayAnn = announcements;
+        if (currentRole === 'Parent') {
+          displayAnn = announcements.filter(a => a.audienceType === 'parents' || a.audienceType === 'school' || a.targetClassId === 'class_001');
+        }
+        const topAnn = displayAnn.slice(0, 3);
+        if (topAnn.length === 0) {
+          recentNoticesEl.innerHTML = `<div style="font-size: 12px; color: #94a3b8; padding: 12px 0;">No announcements available.</div>`;
+        } else {
+          recentNoticesEl.innerHTML = topAnn.map(a => {
+            const badgeClass = a.priority === 'urgent' ? 'badge-urgent' : a.priority === 'important' ? 'badge-important' : 'badge-normal';
+            return `
+              <div class="notice-card" onclick="viewAnnouncementDetail('${a.id}')">
+                <div class="notice-icon-box notice-icon-amber"><i class="fa-solid fa-bullhorn"></i></div>
+                <div class="notice-details">
+                  <div class="notice-title-row">
+                    <div class="notice-title">${a.title}</div>
+                    <div class="${badgeClass}">${(a.priority || 'normal').toUpperCase()}</div>
+                  </div>
+                  <div class="notice-sub">${a.audienceType === 'parents' ? 'For Parents' : a.targetClassId ? 'Class Circular' : 'For All Students & Parents'}</div>
+                  <div class="notice-meta">${a.date || 'Recent'}</div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // 4. Render Upcoming Homework on Dashboard
+      const upcomingHWEl = document.getElementById('dashUpcomingHW');
+      if (upcomingHWEl) {
+        let displayHW = homework;
+        if (currentRole === 'Parent') {
+          displayHW = homework.filter(h => h.classId === 'class_001' || (h.className && h.className.includes('5')));
+        }
+        const topHW = displayHW.slice(0, 2);
+        if (topHW.length === 0) {
+          upcomingHWEl.innerHTML = `<div style="font-size: 12px; color: #94a3b8; padding: 12px 0;">No upcoming homework.</div>`;
+        } else {
+          upcomingHWEl.innerHTML = topHW.map(h => {
+            const cls = classes.find(c => c.id === h.classId);
+            const className = cls ? `${cls.name} - ${cls.section}` : (h.className || 'Grade 5 - A');
+            return `
+              <div class="notice-card" onclick="showScreen(5)">
+                <div class="notice-icon-box notice-icon-purple"><i class="fa-solid fa-book"></i></div>
+                <div class="notice-details">
+                  <div class="notice-title">${h.title}</div>
+                  <div class="notice-sub">${className} &bull; ${h.subject || 'General'}</div>
+                  <div class="notice-meta">Due: ${h.dueDate || 'Upcoming'}</div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+    }
+
+    function updateDashboardStats() {
+      const auth = loadData('schoolconnect_auth', null);
+      const profile = loadData('schoolconnect_profile', { name: 'Priya Sharma', role: 'Teacher', mobile: '' });
+      const currentRole = auth?.role || authState.role || profile.role || 'Teacher';
+      const currentName = auth?.userName || authState.userName || profile.name || (currentRole === 'Admin' ? 'Admin' : currentRole === 'Parent' ? 'Ravi Kumar' : 'Priya Sharma');
+      renderRoleDashboard(currentRole, currentName);
+    }
+
+    /* ── Populate Class Dropdowns Across Modals ── */
+    function populateClassDropdowns() {
+      const classes = loadData('schoolconnect_classes', []);
+      const astSelect = document.getElementById('astClassSelect');
+      if (astSelect) {
+        if (classes.length === 0) {
+          astSelect.innerHTML = `<option value="">-- No classes available --</option>`;
+        } else {
+          astSelect.innerHTML = classes.map(c => `<option value="${c.id}">${c.name} - ${c.section}</option>`).join('');
+        }
+      }
+
+      const hwSelect = document.getElementById('hwClassSelect');
+      if (hwSelect) {
+        if (classes.length === 0) {
+          hwSelect.innerHTML = `<option value="">-- No classes available --</option>`;
+        } else {
+          hwSelect.innerHTML = classes.map(c => `<option value="${c.id}">${c.name} - ${c.section}</option>`).join('');
+        }
+      }
+
+      const chipsContainer = document.getElementById('studentClassChips');
+      if (chipsContainer) {
+        const students = loadData('schoolconnect_students', []);
+        let chipsHtml = `<div class="chip active" onclick="filterStudentsByClass(this, 'all')">All (${students.length})</div>`;
+        classes.forEach(c => {
+          const count = students.filter(s => s.classId === c.id || s.classId === (c.name + c.section) || s.classId === (c.name + ' - ' + c.section)).length;
+          chipsHtml += `<div class="chip" onclick="filterStudentsByClass(this, '${c.id}')">${c.name} - ${c.section} (${count})</div>`;
+        });
+        chipsContainer.innerHTML = chipsHtml;
+      }
+    }
+
+    /* ==========================================================================
+       SECTION D: CLASSES CRUD & RENDERING (SCREEN 3)
+       ========================================================================== */
+    let editingClassId = null;
+
+    function renderClassesUI() {
+      const container = document.getElementById('classesList');
+      if (!container) return;
+      const classes = loadData('schoolconnect_classes', []);
+      const students = loadData('schoolconnect_students', []);
+      const colours = ['class-cyan', 'class-green', 'class-purple', 'class-orange'];
+
+      if (classes.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 30px 16px; color: #94a3b8;">
+            <i class="fa-solid fa-door-open" style="font-size: 32px; margin-bottom: 10px; color: #cbd5e1;"></i>
+            <div style="font-weight: 700; color: #475569;">No classes yet</div>
+            <div style="font-size: 12px; margin-top: 4px;">Click "+ Add Class" above to create one.</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = classes.map((c, idx) => {
+        const numMatch = (c.name || '').match(/\d+/);
+        const shortCode = ((numMatch ? numMatch[0] : (c.name || '').charAt(0).toUpperCase()) + (c.section || '').toUpperCase()) || 'CL';
+        const colour = colours[idx % colours.length];
+        const studentCount = students.filter(s => s.classId === c.id || s.classId === (c.name + c.section) || s.classId === (c.name + ' - ' + c.section)).length;
+
+        return `
+          <div class="class-card" id="card_${c.id}">
+            <div class="class-avatar ${colour}">${shortCode}</div>
+            <div class="class-info">
+              <div class="class-name">${c.name} - ${(c.section || '').toUpperCase()}</div>
+              <div class="class-teacher">Class Teacher: Priya Sharma</div>
+              <div class="class-count">${studentCount} Students &bull; ${c.academicYear || '2026-27'}</div>
+            </div>
+            <div class="card-actions-row">
+              <button class="card-action-btn" title="Edit Class" onclick="event.stopPropagation(); openAddClassModal('${c.id}')">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+              <button class="card-action-btn btn-delete" title="Delete Class" onclick="event.stopPropagation(); deleteClass('${c.id}')">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openAddClassModal(classId = null) {
+      editingClassId = classId;
+      const titleEl = document.getElementById('addClassModalTitle');
+      const submitBtn = document.getElementById('acSubmitBtn');
+
+      ['acClassName','acSection','acAcadYear'].forEach(id => {
+        document.getElementById(id).value = '';
+        document.getElementById(id).classList.remove('error');
+      });
+      ['acClassNameErr','acSectionErr','acAcadYearErr'].forEach(id => {
+        document.getElementById(id).classList.remove('show');
+      });
+
+      if (classId) {
+        const classes = loadData('schoolconnect_classes', []);
+        const target = classes.find(c => c.id === classId);
+        if (target) {
+          document.getElementById('acClassName').value = target.name || '';
+          document.getElementById('acSection').value = target.section || '';
+          document.getElementById('acAcadYear').value = target.academicYear || '';
+          if (titleEl) titleEl.textContent = 'Edit Class';
+          if (submitBtn) submitBtn.textContent = 'Save Changes';
+        }
+      } else {
+        if (titleEl) titleEl.textContent = 'Add New Class';
+        if (submitBtn) submitBtn.textContent = 'Add Class';
+        document.getElementById('acAcadYear').value = '2026-27';
+      }
+
+      document.getElementById('addClassModal').classList.add('open');
+    }
+
+    function closeAddClassModal() {
+      editingClassId = null;
+      document.getElementById('addClassModal').classList.remove('open');
+    }
+
+    function handleModalBgClick(e) {
+      if (e.target.id === 'addClassModal') closeAddClassModal();
+    }
+
+    function submitAddClass() {
+      const nameInput = document.getElementById('acClassName');
+      const sectionInput = document.getElementById('acSection');
+      const yearInput = document.getElementById('acAcadYear');
+
+      const nameVal = nameInput.value.trim();
+      const sectionVal = sectionInput.value.trim().toUpperCase();
+      const yearVal = yearInput.value.trim();
+
+      let hasErr = false;
+      if (!nameVal) {
+        nameInput.classList.add('error');
+        document.getElementById('acClassNameErr').classList.add('show');
+        hasErr = true;
+      }
+      if (!sectionVal) {
+        sectionInput.classList.add('error');
+        document.getElementById('acSectionErr').classList.add('show');
+        hasErr = true;
+      }
+      if (!yearVal) {
+        yearInput.classList.add('error');
+        document.getElementById('acAcadYearErr').classList.add('show');
+        hasErr = true;
+      }
+      if (hasErr) return;
+
+      const classes = loadData('schoolconnect_classes', []);
+
+      if (editingClassId) {
+        const idx = classes.findIndex(c => c.id === editingClassId);
+        if (idx !== -1) {
+          classes[idx].name = nameVal;
+          classes[idx].section = sectionVal;
+          classes[idx].academicYear = yearVal;
+          saveData('schoolconnect_classes', classes);
+          showToast(`Class updated: ${nameVal} - ${sectionVal}`);
+        }
+      } else {
+        const newClass = {
+          id: `class_${Date.now()}`,
+          name: nameVal,
+          section: sectionVal,
+          academicYear: yearVal,
+          createdAt: new Date().toISOString()
+        };
+        classes.push(newClass);
+        saveData('schoolconnect_classes', classes);
+        showToast(`Class added: ${nameVal} - ${sectionVal}`);
+      }
+
+      closeAddClassModal();
+      renderClassesUI();
+      populateClassDropdowns();
+      updateDashboardStats();
+    }
+
+    function deleteClass(classId) {
+      if (!confirm('Are you sure you want to delete this class?')) return;
+      const classes = loadData('schoolconnect_classes', []);
+      const updated = classes.filter(c => c.id !== classId);
+      saveData('schoolconnect_classes', updated);
+      renderClassesUI();
+      populateClassDropdowns();
+      updateDashboardStats();
+      showToast('Class deleted');
+    }
+
+    /* ==========================================================================
+       SECTION E: STUDENTS CRUD & RENDERING (SCREEN 4)
+       ========================================================================== */
+    let activeStudentClassFilter = 'all';
+
+    function renderStudentsUI() {
+      const container = document.getElementById('studentsList');
+      if (!container) return;
+
+      const role = authState.role || 'Teacher';
+      const students = loadData('schoolconnect_students', []);
+      const titleEl = document.getElementById('studentsPageTitle');
+      const subEl = document.getElementById('studentsPageSubtitle');
+      const addBtn = document.getElementById('addStudentBtn');
+      const searchRow = document.getElementById('studentSearchRow');
+      const chipsRow = document.getElementById('studentClassChips');
+
+      if (role === 'Parent') {
+        if (titleEl) titleEl.textContent = 'My Children';
+        if (subEl) subEl.textContent = 'Your registered wards at SchoolConnect';
+        if (addBtn) addBtn.style.display = 'none';
+        if (chipsRow) chipsRow.style.display = 'none';
+        if (searchRow) searchRow.style.display = 'none';
+
+        // Filter to parent's child (Aarav Kumar)
+        const myChildren = students.filter(s => s.name === 'Aarav Kumar' || s.id === 'std_001');
+        if (myChildren.length === 0) {
+          container.innerHTML = `<div style="text-align: center; padding: 20px; color: #94a3b8;">No registered children found.</div>`;
+          return;
+        }
+
+        container.innerHTML = myChildren.map(s => `
+          <div class="student-card" id="student_${s.id}">
+            <div class="student-avatar"><i class="fa-solid fa-child"></i></div>
+            <div class="student-info">
+              <div class="student-name">${s.name}</div>
+              <div class="student-roll">Adm No: ${s.admissionNumber || 'ADM001'}</div>
+              <div style="font-size: 11px; color: #2563eb; font-weight: 700; margin-top: 2px;">Class: ${resolveClassName(s.classId)}</div>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+              <span class="badge-status status-active">ACTIVE</span>
+              <span style="font-size: 10px; color: #059669; font-weight: 700;">96% Attendance</span>
+            </div>
+          </div>
+        `).join('');
+        return;
+      }
+
+      // Admin & Teacher UI
+      if (titleEl) titleEl.textContent = 'Students';
+      if (subEl) subEl.textContent = 'Manage your students';
+      if (addBtn) addBtn.style.display = 'flex';
+      if (chipsRow) chipsRow.style.display = 'flex';
+      if (searchRow) searchRow.style.display = 'flex';
+
+      let filtered = students;
+      if (activeStudentClassFilter !== 'all') {
+        filtered = students.filter(s => s.classId === activeStudentClassFilter);
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 30px 16px; color: #94a3b8;">
+            <i class="fa-solid fa-user-group" style="font-size: 32px; margin-bottom: 10px; color: #cbd5e1;"></i>
+            <div style="font-weight: 700; color: #475569;">No students found</div>
+            <div style="font-size: 12px; margin-top: 4px;">Click "+ Add Student" above to enroll students.</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(s => `
+        <div class="student-card" id="student_${s.id}">
+          <div class="student-avatar"><i class="fa-solid fa-user"></i></div>
+          <div class="student-info">
+            <div class="student-name">${s.name}</div>
+            <div class="student-roll">${s.admissionNumber || 'ADM'}</div>
+            <div style="font-size: 11px; color: #64748b;">${resolveClassName(s.classId)}</div>
+          </div>
+          <span class="badge-status status-active">ACTIVE</span>
+          <button class="card-action-btn btn-delete" style="margin-left: 6px;" title="Delete Student" onclick="event.stopPropagation(); deleteStudent('${s.id}')">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function filterStudentsByClass(el, classId) {
+      document.querySelectorAll('#studentClassChips .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      activeStudentClassFilter = classId;
+      renderStudentsUI();
+    }
+
+    function openAddStudentModal() {
+      ['astName','astAdmNo'].forEach(id => {
+        document.getElementById(id).value = '';
+        document.getElementById(id).classList.remove('error');
+      });
+      ['astNameErr','astAdmNoErr','astClassErr'].forEach(id => {
+        document.getElementById(id).classList.remove('show');
+      });
+      populateClassDropdowns();
+      document.getElementById('addStudentModal').classList.add('open');
+    }
+
+    function closeAddStudentModal() {
+      document.getElementById('addStudentModal').classList.remove('open');
+    }
+
+    function handleStudentModalBgClick(e) {
+      if (e.target.id === 'addStudentModal') closeAddStudentModal();
+    }
+
+    function submitAddStudent() {
+      const name = document.getElementById('astName').value.trim();
+      const admNo = document.getElementById('astAdmNo').value.trim().toUpperCase();
+      const classId = document.getElementById('astClassSelect').value;
+
+      let hasErr = false;
+      if (!name) {
+        document.getElementById('astName').classList.add('error');
+        document.getElementById('astNameErr').classList.add('show');
+        hasErr = true;
+      }
+      if (!admNo) {
+        document.getElementById('astAdmNo').classList.add('error');
+        document.getElementById('astAdmNoErr').classList.add('show');
+        hasErr = true;
+      }
+      if (!classId) {
+        document.getElementById('astClassSelect').classList.add('error');
+        document.getElementById('astClassErr').classList.add('show');
+        hasErr = true;
+      }
+      if (hasErr) return;
+
+      const students = loadData('schoolconnect_students', []);
+      const newStudent = {
+        id: `std_${Date.now()}`,
+        name: name,
+        admissionNumber: admNo,
+        classId: classId,
+        createdAt: new Date().toISOString()
+      };
+      students.push(newStudent);
+      saveData('schoolconnect_students', students);
+
+      closeAddStudentModal();
+      renderStudentsUI();
+      populateClassDropdowns();
+      updateDashboardStats();
+      showToast(`Student added: ${name}`);
+    }
+
+    function deleteStudent(studentId) {
+      if (!confirm('Are you sure you want to remove this student?')) return;
+      const students = loadData('schoolconnect_students', []);
+      const updated = students.filter(s => s.id !== studentId);
+      saveData('schoolconnect_students', updated);
+      renderStudentsUI();
+      populateClassDropdowns();
+      updateDashboardStats();
+      showToast('Student removed');
+    }
+
+    /* ==========================================================================
+       SECTION F: HOMEWORK CRUD & RENDERING (SCREENS 5 & 6)
+       ========================================================================== */
+    let currentHWFilter = 'all';
+
+    function renderHomeworkUI(filter = currentHWFilter) {
+      currentHWFilter = filter;
+      const container = document.getElementById('hwList');
+      if (!container) return;
+
+      const role = authState.role || 'Teacher';
+      const homework = loadData('schoolconnect_homework', []);
+      const titleEl = document.getElementById('hwPageTitle');
+      const subEl = document.getElementById('hwPageSubtitle');
+      const addBtn = document.getElementById('addHwBtn');
+
+      let list = homework;
+      if (role === 'Parent') {
+        if (titleEl) titleEl.textContent = "Child's Homework";
+        if (subEl) subEl.textContent = 'Assignments for Aarav Kumar (Grade 5 - A)';
+        if (addBtn) addBtn.style.display = 'none';
+        // Filter homework for Grade 5 - A
+        list = homework.filter(h => h.classId === 'class_001' || (h.className && h.className.includes('5')));
+      } else {
+        if (titleEl) titleEl.textContent = 'Homework';
+        if (subEl) subEl.textContent = 'Create and manage homework assignments';
+        if (addBtn) addBtn.style.display = 'flex';
+      }
+
+      if (filter === 'upcoming') {
+        list = list.filter(h => h.status === 'upcoming');
+      } else if (filter === 'overdue') {
+        list = list.filter(h => h.status === 'overdue');
+      }
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 30px 16px; color: #94a3b8;">
+            <i class="fa-regular fa-file-lines" style="font-size: 32px; margin-bottom: 10px; color: #cbd5e1;"></i>
+            <div style="font-weight: 700; color: #475569;">No homework found</div>
+          </div>
+        `;
+        return;
+      }
+
+      const subjectIcons = {
+        'Mathematics': { icon: 'fa-solid fa-calculator', color: 'hw-icon-math' },
+        'Science': { icon: 'fa-solid fa-seedling', color: 'hw-icon-science' },
+        'English': { icon: 'fa-solid fa-book-open', color: 'hw-icon-english' },
+        'Social Science': { icon: 'fa-solid fa-globe', color: 'hw-icon-social' },
+        'Hindi': { icon: 'fa-solid fa-language', color: 'hw-icon-social' }
+      };
+
+      container.innerHTML = list.map(h => {
+        const iconConfig = subjectIcons[h.subject] || { icon: 'fa-solid fa-book', color: 'hw-icon-social' };
+        const statusBadge = h.status === 'overdue' 
+          ? '<span class="badge badge-urgent">OVERDUE</span>' 
+          : '<span class="badge badge-normal" style="color: #059669; background: #ecfdf5;">UPCOMING</span>';
+
+        const deleteBtn = (role !== 'Parent') 
+          ? `<button class="card-action-btn btn-delete" style="margin-left: 6px;" title="Delete Homework" onclick="event.stopPropagation(); deleteHomework('${h.id}')"><i class="fa-solid fa-trash"></i></button>`
+          : '';
+
+        return `
+          <div class="hw-card" id="hw_${h.id}">
+            <div class="hw-icon-box ${iconConfig.color}">
+              <i class="${iconConfig.icon}"></i>
+            </div>
+            <div class="hw-details">
+              <div class="hw-title-row">
+                <div class="hw-title">${h.title}</div>
+                ${statusBadge}
+              </div>
+              <div class="hw-sub">${resolveClassName(h.classId)} &bull; ${h.subject}</div>
+              <div class="hw-due">Due: ${h.dueDate || '2025-08-30'}</div>
+            </div>
+            ${deleteBtn}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterHW(el, filter) {
+      document.querySelectorAll('#screen5 .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      renderHomeworkUI(filter);
+    }
+
+    function openCreateHomeworkScreen() {
+      const role = authState.role || 'Teacher';
+      if (!canAccess(6, role)) {
+        showToast(`Access denied. Role '${role}' cannot create homework.`);
+        showScreen(2);
+        return;
+      }
+      populateClassDropdowns();
+      showScreen(6);
+    }
+
+    function submitCreateHomework() {
+      const classId = document.getElementById('hwClassSelect').value;
+      const subject = document.getElementById('hwSubjectSelect').value;
+      const title = document.getElementById('hwTitleInput').value.trim();
+      const desc = document.getElementById('hwDescInput').value.trim();
+      const dueDate = document.getElementById('hwDueDateInput').value;
+
+      if (!title) {
+        showToast('Please enter homework title');
+        return;
+      }
+
+      const homework = loadData('schoolconnect_homework', []);
+      const newHW = {
+        id: `hw_${Date.now()}`,
+        classId: classId,
+        subject: subject,
+        title: title,
+        description: desc,
+        assignedDate: new Date().toISOString().split('T')[0],
+        dueDate: dueDate,
+        status: 'upcoming',
+        createdAt: new Date().toISOString()
+      };
+
+      homework.unshift(newHW);
+      saveData('schoolconnect_homework', homework);
+
+      document.getElementById('hwTitleInput').value = '';
+      showToast('Homework assigned successfully! 📚');
+      updateDashboardStats();
+      showScreen(5);
+    }
+
+    function deleteHomework(hwId) {
+      if (!confirm('Are you sure you want to delete this homework?')) return;
+      const homework = loadData('schoolconnect_homework', []);
+      const updated = homework.filter(h => h.id !== hwId);
+      saveData('schoolconnect_homework', updated);
+      renderHomeworkUI(currentHWFilter);
+      updateDashboardStats();
+      showToast('Homework deleted');
+    }
+
+    /* ==========================================================================
+       SECTION G: ANNOUNCEMENTS CRUD & RENDERING (SCREENS 7 & 8)
+       ========================================================================== */
+    let currentNoticeFilter = 'all';
+
+    function renderAnnouncementsUI(filter = currentNoticeFilter) {
+      currentNoticeFilter = filter;
+      const container = document.getElementById('noticesList');
+      if (!container) return;
+
+      const role = authState.role || 'Teacher';
+      const announcements = loadData('schoolconnect_announcements', []);
+      const titleEl = document.getElementById('annPageTitle');
+      const subEl = document.getElementById('annPageSubtitle');
+      const addBtn = document.getElementById('addAnnBtn');
+
+      let list = announcements;
+      if (role === 'Parent') {
+        if (titleEl) titleEl.textContent = 'Notices & Circulars';
+        if (subEl) subEl.textContent = 'School notices for parents and students';
+        if (addBtn) addBtn.style.display = 'none';
+        list = announcements.filter(a => a.audienceType === 'parents' || a.audienceType === 'school' || a.targetClassId === 'class_001');
+      } else {
+        if (titleEl) titleEl.textContent = 'Announcements';
+        if (subEl) subEl.textContent = 'School circulars and notices';
+        if (addBtn) addBtn.style.display = 'flex';
+      }
+
+      if (filter === 'school') {
+        list = list.filter(a => a.audienceType === 'school');
+      } else if (filter === 'class') {
+        list = list.filter(a => a.audienceType === 'class' || a.targetClassId);
+      } else if (filter === 'parents') {
+        list = list.filter(a => a.audienceType === 'parents');
+      }
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 30px 16px; color: #94a3b8;">
+            <i class="fa-solid fa-bullhorn" style="font-size: 32px; margin-bottom: 10px; color: #cbd5e1;"></i>
+            <div style="font-weight: 700; color: #475569;">No announcements found</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = list.map(a => {
+        const badgeClass = a.priority === 'urgent' ? 'badge-urgent' : a.priority === 'important' ? 'badge-important' : 'badge-normal';
+        const deleteBtn = (role !== 'Parent')
+          ? `<button class="card-action-btn btn-delete" style="margin-left: 6px;" title="Delete Announcement" onclick="event.stopPropagation(); deleteAnnouncement('${a.id}')"><i class="fa-solid fa-trash"></i></button>`
+          : '';
+
+        return `
+          <div class="notice-card" id="ann_${a.id}" onclick="viewAnnouncementDetail('${a.id}')">
+            <div class="notice-icon-box notice-icon-amber"><i class="fa-regular fa-file-lines"></i></div>
+            <div class="notice-details">
+              <div class="notice-title-row">
+                <div class="${badgeClass}">${(a.priority || 'normal').toUpperCase()}</div>
+                <div class="notice-meta">${a.date || 'Aug 25, 2025'}</div>
+              </div>
+              <div class="notice-title" style="margin-top: 4px;">${a.title}</div>
+              <div class="notice-sub">${a.audienceType === 'parents' ? 'For Parents' : a.targetClassId ? 'For ' + resolveClassName(a.targetClassId) : 'For All Students & Parents'}</div>
+            </div>
+            ${deleteBtn}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterNotices(el, filter) {
+      document.querySelectorAll('#screen7 .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      renderAnnouncementsUI(filter);
+    }
+
+    function openAddAnnouncementModal() {
+      const role = authState.role || 'Teacher';
+      if (role === 'Parent') {
+        showToast('Parents do not have permission to publish notices.');
+        return;
+      }
+      document.getElementById('annTitleInput').value = '';
+      document.getElementById('annContentInput').value = '';
+      ['annTitleErr','annContentErr'].forEach(id => document.getElementById(id).classList.remove('show'));
+      document.getElementById('addAnnouncementModal').classList.add('open');
+    }
+
+    function closeAddAnnouncementModal() {
+      document.getElementById('addAnnouncementModal').classList.remove('open');
+    }
+
+    function handleAnnouncementModalBgClick(e) {
+      if (e.target.id === 'addAnnouncementModal') closeAddAnnouncementModal();
+    }
+
+    function submitAddAnnouncement() {
+      const title = document.getElementById('annTitleInput').value.trim();
+      const audience = document.getElementById('annTypeSelect').value;
+      const priority = document.getElementById('annPrioritySelect').value;
+      const content = document.getElementById('annContentInput').value.trim();
+
+      let hasErr = false;
+      if (!title) {
+        document.getElementById('annTitleErr').classList.add('show');
+        hasErr = true;
+      }
+      if (!content) {
+        document.getElementById('annContentErr').classList.add('show');
+        hasErr = true;
+      }
+      if (hasErr) return;
+
+      const announcements = loadData('schoolconnect_announcements', []);
+      const newAnn = {
+        id: `ann_${Date.now()}`,
+        title: title,
+        content: content,
+        priority: priority,
+        audienceType: audience,
+        targetClassId: audience === 'class' ? 'class_001' : null,
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        createdAt: new Date().toISOString()
+      };
+
+      announcements.unshift(newAnn);
+      saveData('schoolconnect_announcements', announcements);
+
+      closeAddAnnouncementModal();
+      renderAnnouncementsUI(currentNoticeFilter);
+      updateDashboardStats();
+      showToast('Announcement published! 📢');
+    }
+
+    function deleteAnnouncement(annId) {
+      if (!confirm('Are you sure you want to delete this notice?')) return;
+      const announcements = loadData('schoolconnect_announcements', []);
+      const updated = announcements.filter(a => a.id !== annId);
+      saveData('schoolconnect_announcements', updated);
+      renderAnnouncementsUI(currentNoticeFilter);
+      updateDashboardStats();
+      showToast('Announcement removed');
+    }
+
+    function viewAnnouncementDetail(annId) {
+      const announcements = loadData('schoolconnect_announcements', []);
+      const target = announcements.find(a => a.id === annId);
+
+      if (target) {
+        const badgeEl = document.getElementById('detailBadge');
+        const titleEl = document.getElementById('detailTitle');
+        const dateEl = document.getElementById('detailDate');
+        const targetEl = document.getElementById('detailTarget');
+        const bodyEl = document.getElementById('detailBody');
+
+        if (badgeEl) {
+          badgeEl.className = 'badge ' + (target.priority === 'urgent' ? 'badge-urgent' : target.priority === 'important' ? 'badge-important' : 'badge-normal');
+          badgeEl.textContent = (target.priority || 'normal').toUpperCase();
+        }
+        if (titleEl) titleEl.textContent = target.title;
+        if (dateEl) dateEl.textContent = (target.date || 'Aug 25, 2025') + ' • 10:30 AM';
+        if (targetEl) {
+          targetEl.textContent = target.targetClassId ? `For ${resolveClassName(target.targetClassId)}` : (target.audienceType === 'parents' ? 'For Parents' : 'For All Students & Parents');
+        }
+        if (bodyEl) bodyEl.innerHTML = target.content.replace(/\n/g, '<br>');
+      }
+      showScreen(8);
+    }
+
+    /* ==========================================================================
+       SECTION H: GENERAL UTILITIES & PAGE INITIALIZATION
+       ========================================================================== */
+    function filterStudents() {
+      const q = document.getElementById('studentSearch').value.toLowerCase();
+      document.querySelectorAll('.student-card').forEach(card => {
+        const text = card.innerText.toLowerCase();
+        card.style.display = text.includes(q) ? 'flex' : 'none';
+      });
+    }
+
+    function toggleDrawer() {
+      document.getElementById('drawerOverlay').classList.toggle('open');
+    }
+
+    function togglePassword() {
+      const pass = document.getElementById('loginPass');
+      pass.type = pass.type === 'password' ? 'text' : 'password';
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastBox');
+      document.getElementById('toastMsg').innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    /* ── Page Load Session Restoration ── */
+    window.addEventListener('DOMContentLoaded', () => {
+      // 1. Initialize prototype demo data in localStorage
+      initSchoolConnectData();
+
+      // 2. Check for active authenticated session in localStorage
+      const auth = loadData('schoolconnect_auth', null);
+      const storedProfile = loadData('schoolconnect_profile', null);
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramScreen = parseInt(urlParams.get('screen'));
+      const hashScreen = window.location.hash ? parseInt(window.location.hash.replace(/\D/g, '')) : null;
+      const targetScreen = paramScreen || hashScreen;
+
+      if (auth && auth.isAuthenticated && auth.role) {
+        authState.isAuthenticated = true;
+        authState.role = auth.role;
+        authState.userName = auth.userName || (auth.role === 'Admin' ? 'Admin' : auth.role === 'Parent' ? 'Ravi Kumar' : 'Priya Sharma');
+        authState.mobile = auth.mobile || '';
+
+        renderRoleDashboard(auth.role, authState.userName);
+        renderRoleNavigation(auth.role);
+
+        const screenToOpen = targetScreen || 2;
+        if (canAccess(screenToOpen, auth.role)) {
+          showScreen(screenToOpen, true);
+        } else {
+          showScreen(2, true);
+        }
+      } else {
+        // Unauthenticated state
+        authState.isAuthenticated = false;
+        authState.role = storedProfile?.role || 'Teacher';
+        renderRoleNavigation(authState.role);
+
+        if (targetScreen && targetScreen > 1) {
+          // Dev preview mode
+          showScreen(targetScreen, true);
+        } else {
+          showScreen(1, true); // Sign In Screen
+        }
+      }
+    });
+    
+  </script>
+</body>
+</html>

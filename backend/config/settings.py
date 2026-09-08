@@ -26,11 +26,11 @@ SECRET_KEY = os.getenv(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = [
+ALLOWED_HOSTS = ['*'] if DEBUG else [
     host.strip()
-    for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,10.0.2.2').split(',')
+    for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,10.0.2.2,testserver').split(',')
     if host.strip()
-]
+] + ['testserver']
 
 # Application definition
 INSTALLED_APPS = [
