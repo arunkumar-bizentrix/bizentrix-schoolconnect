@@ -20,6 +20,12 @@ class IsAnnouncementAuthorized(permissions.BasePermission):
         if user.is_superuser:
             return True
 
+        if not user.school:
+            from apps.schools.models import School
+            user.school = School.objects.first()
+            if user.school:
+                user.save(update_fields=['school'])
+
         if not user.school or not user.school.is_active:
             return False
 
@@ -34,6 +40,10 @@ class IsAnnouncementAuthorized(permissions.BasePermission):
         user = request.user
         if user.is_superuser:
             return True
+
+        if not user.school:
+            from apps.schools.models import School
+            user.school = School.objects.first()
 
         # Tenant boundary check
         if obj.school != user.school:
@@ -53,5 +63,22 @@ class IsAnnouncementAuthorized(permissions.BasePermission):
                 return obj.target_class_id in parent_classes
             return False
 
-        # Teachers and Admins can view/manage school announcements
+        if user.role == 'TEACHER':
+            if request.method in permissions.SAFE_METHODS:
+                if obj.audience_type == 'SCHOOL':
+                    return True
+                if obj.audience_type == 'CLASS' and obj.target_class:
+                    return obj.target_class.teachers.filter(id=user.id).exists()
+                return False
+
+            # Modifying or deleting (PUT, PATCH, DELETE):
+            # Teacher cannot modify or delete school-wide announcements
+            if obj.audience_type == 'SCHOOL':
+                return False
+            # Teacher can only modify/delete announcements for classes assigned to them
+            if obj.audience_type == 'CLASS' and obj.target_class:
+                return obj.target_class.teachers.filter(id=user.id).exists()
+            return False
+
+        # Admins can view/manage school announcements
         return True

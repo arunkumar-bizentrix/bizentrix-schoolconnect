@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/network/api_client.dart';
-import '../../../core/network/api_endpoints.dart';
 import '../../../core/providers/school_providers.dart';
-import '../models/homework_model.dart';
 
 class CreateHomeworkScreen extends ConsumerStatefulWidget {
   const CreateHomeworkScreen({super.key});
@@ -16,18 +13,25 @@ class CreateHomeworkScreen extends ConsumerStatefulWidget {
 
 class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
   final _formKey = GlobalKey<FormState>();
-  String _selectedClass = 'Grade 5 - A';
+  int? _selectedClassId;
+  bool _assignToIndividual = false;
+  int? _selectedStudentId;
   String _selectedSubject = 'Mathematics';
-  final _titleController = TextEditingController(text: 'Chapter 5 - Problem Set');
-  final _descriptionController = TextEditingController(
-    text: 'Complete the exercises 1 to 10 from Chapter 5. Show your working steps clearly.',
-  );
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
   DateTime _dueDate = DateTime.now().add(const Duration(days: 3));
   PlatformFile? _pickedAttachment;
   bool _isSubmitting = false;
 
-  final List<String> _classes = ['Grade 5 - A', 'Grade 6 - B'];
-  final List<String> _subjects = ['Mathematics', 'Science', 'English', 'Social Science'];
+  final List<String> _subjects = [
+    'Mathematics',
+    'Science',
+    'English',
+    'Social Science',
+    'Computer Science',
+    'Hindi',
+    'Tamil',
+  ];
 
   @override
   void dispose() {
@@ -49,57 +53,87 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
 
   void _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedClassId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a class'),
+          backgroundColor: AppColors.statusOverdueText,
+        ),
+      );
+      return;
+    }
+
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    if (_dueDate.isBefore(today)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Due date cannot be in the past. Please select today or a future date.'),
+          backgroundColor: AppColors.statusOverdueText,
+        ),
+      );
+      return;
+    }
+
+    if (_assignToIndividual && _selectedStudentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select an individual student from the list'),
+          backgroundColor: AppColors.statusOverdueText,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isSubmitting = true);
-    final apiClient = ref.read(apiClientProvider);
 
-    try {
-      await apiClient.dio.post(
-        ApiEndpoints.homeworkList,
-        data: {
-          'classroom': _selectedClass == 'Grade 5 - A' ? 1 : 2,
-          'subject': _selectedSubject,
-          'title': _titleController.text.trim(),
-          'description': _descriptionController.text.trim(),
-          'due_date': _dueDate.toIso8601String().split('T').first,
-        },
-      );
-    } catch (_) {
-      // Gracefully continue even if network is simulated
-    }
+    final error = await ref.read(homeworkProvider.notifier).createHomework(
+      classroomId: _selectedClassId!,
+      studentId: _assignToIndividual ? _selectedStudentId : null,
+      subject: _selectedSubject,
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
+      dueDate: _dueDate,
+      attachmentFilePath: _pickedAttachment?.path,
+    );
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Homework created successfully!'),
-        backgroundColor: AppColors.statusActiveText,
-      ),
-    );
-
-    // Add to local state immediately (visible on Homework tab right away)
-    final classId = _selectedClass == 'Grade 5 - A' ? 1 : 2;
-    final existing = ref.read(homeworkProvider).value ?? [];
-    final newId = existing.isEmpty ? 1 : existing.map((h) => h.id).reduce((a, b) => a > b ? a : b) + 1;
-    ref.read(homeworkProvider.notifier).addHomework(
-      HomeworkModel(
-        id: newId,
-        classroomId: classId,
-        classroomName: _selectedClass,
-        subject: _selectedSubject,
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        assignedDate: DateTime.now(),
-        dueDate: _dueDate,
-        isActive: true,
-      ),
-    );
-    Navigator.pop(context);
+    if (error == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _assignToIndividual
+                ? 'Targeted homework created for student!'
+                : 'Homework created successfully!',
+          ),
+          backgroundColor: AppColors.statusActiveText,
+        ),
+      );
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: AppColors.statusOverdueText,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final classesAsync = ref.watch(classesProvider);
+    final classes = classesAsync.value ?? [];
+    final studentsAsync = ref.watch(studentsProvider);
+    final allStudents = studentsAsync.value ?? [];
+
+    if (_selectedClassId == null && classes.isNotEmpty) {
+      _selectedClassId = classes.first.id;
+    }
+
+    final classStudents = allStudents.where((s) => s.classId == _selectedClassId).toList();
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -131,20 +165,166 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: _fieldBoxDecoration(),
                 child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedClass,
+                  child: DropdownButton<int>(
+                    value: classes.any((c) => c.id == _selectedClassId)
+                        ? _selectedClassId
+                        : (classes.isNotEmpty ? classes.first.id : null),
                     isExpanded: true,
+                    hint: const Text('Select a class', style: TextStyle(fontSize: 14)),
                     icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textSecondary),
-                    items: _classes.map((cls) {
-                      return DropdownMenuItem(value: cls, child: Text(cls, style: const TextStyle(fontSize: 14)));
+                    items: classes.map((cls) {
+                      return DropdownMenuItem<int>(
+                        value: cls.id,
+                        child: Text(cls.name, style: const TextStyle(fontSize: 14)),
+                      );
                     }).toList(),
                     onChanged: (val) {
-                      if (val != null) setState(() => _selectedClass = val);
+                      if (val != null) {
+                        setState(() {
+                          _selectedClassId = val;
+                          _selectedStudentId = null;
+                        });
+                      }
                     },
                   ),
                 ),
               ),
               const SizedBox(height: 18),
+
+              // Assign Target (Entire Class vs Specific Student)
+              _buildLabel('Assign To *'),
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _assignToIndividual = false),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: !_assignToIndividual ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: !_assignToIndividual
+                                ? [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1))]
+                                : null,
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.groups_rounded,
+                                size: 16,
+                                color: !_assignToIndividual ? AppColors.primary : AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Entire Class',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: !_assignToIndividual ? AppColors.primary : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _assignToIndividual = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _assignToIndividual ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: _assignToIndividual
+                                ? [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1))]
+                                : null,
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.person_rounded,
+                                size: 16,
+                                color: _assignToIndividual ? AppColors.primary : AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Specific Student',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: _assignToIndividual ? AppColors.primary : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Student Dropdown (shown only when Specific Student is chosen)
+              if (_assignToIndividual) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildLabel('Select Student *'),
+                    Text(
+                      '${classStudents.length} enrolled',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: _fieldBoxDecoration(),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      value: classStudents.any((s) => s.id == _selectedStudentId)
+                          ? _selectedStudentId
+                          : null,
+                      isExpanded: true,
+                      hint: Text(
+                        classStudents.isEmpty
+                            ? 'No students enrolled in this class'
+                            : 'Choose student',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textSecondary),
+                      items: classStudents.map((stu) {
+                        return DropdownMenuItem<int>(
+                          value: stu.id,
+                          child: Text(
+                            '${stu.fullName} (${stu.admissionNumber})',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: classStudents.isEmpty
+                          ? null
+                          : (val) {
+                              if (val != null) setState(() => _selectedStudentId = val);
+                            },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
 
               // Subject Dropdown
               _buildLabel('Subject *'),
@@ -227,7 +407,7 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.primaryLight.withOpacity(0.5),
+                      color: AppColors.primaryLight.withValues(alpha: 0.5),
                       width: 1.5,
                       style: BorderStyle.solid,
                     ),
@@ -264,25 +444,27 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
               // Full Width Submit Button
               SizedBox(
                 width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
+                height: 52,
+                child: ElevatedButton.icon(
                   onPressed: _isSubmitting ? null : _handleSubmit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    elevation: 2,
+                    shadowColor: AppColors.primary.withValues(alpha: 0.4),
                   ),
-                  child: _isSubmitting
+                  icon: _isSubmitting
                       ? const SizedBox(
-                          height: 20,
-                          width: 20,
+                          height: 18,
+                          width: 18,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text(
-                          'Create Homework',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                        ),
+                      : const Icon(Icons.send_rounded, size: 18, color: Colors.white),
+                  label: Text(
+                    _isSubmitting ? 'Creating Homework...' : 'Create Homework',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+                  ),
                 ),
               ),
             ],

@@ -26,6 +26,11 @@ class TokenStorage {
     return await _storage.read(key: AppConstants.refreshTokenKey);
   }
 
+  Future<bool> hasValidSession() async {
+    final token = await getAccessToken();
+    return token != null && token.isNotEmpty;
+  }
+
   Future<void> saveUserRole(UserRole role) async {
     await _storage.write(key: AppConstants.userRoleKey, value: role.code);
   }
@@ -33,6 +38,22 @@ class TokenStorage {
   Future<UserRole?> getUserRole() async {
     final code = await _storage.read(key: AppConstants.userRoleKey);
     return code != null ? UserRole.fromCode(code) : null;
+  }
+
+  Future<void> saveUserProfileJson(String jsonStr) async {
+    await _storage.write(key: AppConstants.userProfileKey, value: jsonStr);
+  }
+
+  Future<String?> getUserProfileJson() async {
+    return await _storage.read(key: AppConstants.userProfileKey);
+  }
+
+  Future<void> saveBaseUrlOverride(String url) async {
+    await _storage.write(key: AppConstants.baseUrlOverrideKey, value: url);
+  }
+
+  Future<String?> getBaseUrlOverride() async {
+    return await _storage.read(key: AppConstants.baseUrlOverrideKey);
   }
 
   Future<void> clearAll() async {

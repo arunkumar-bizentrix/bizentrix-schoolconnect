@@ -1,13 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/providers/school_providers.dart';
 
-class AdminDashboardScreen extends StatelessWidget {
+class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final user = ref.watch(authProvider).user;
+    final classesAsync = ref.watch(classesProvider);
+    final studentsAsync = ref.watch(studentsProvider);
+    final homeworkAsync = ref.watch(homeworkProvider);
+    final announcementsAsync = ref.watch(announcementsProvider);
+
+    final schoolName = (user?.schoolName != null && user!.schoolName!.isNotEmpty)
+        ? user.schoolName!
+        : 'Bizentrix SchoolConnect';
+
+    final totalStudents = studentsAsync.value?.length.toString() ?? '0';
+    final totalClasses = classesAsync.value?.length.toString() ?? '0';
+    final totalHomework = homeworkAsync.value?.length.toString() ?? '0';
+    final totalNotices = announcementsAsync.value?.length.toString() ?? '0';
 
     return Scaffold(
       appBar: AppBar(
@@ -19,7 +36,10 @@ class AdminDashboardScreen extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () => context.go('/login'),
+            onPressed: () {
+              ref.read(authProvider.notifier).logout();
+              context.go('/login');
+            },
           ),
         ],
       ),
@@ -46,17 +66,21 @@ class AdminDashboardScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Springfield Academy',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          schoolName,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Text(
@@ -68,7 +92,7 @@ class AdminDashboardScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Academic Session: 2026 - 2027',
+                    'Academic Session: ${AppConstants.currentAcademicYear}',
                     style: TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                 ],
@@ -76,22 +100,22 @@ class AdminDashboardScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Metric Summary Cards
-            Text('Quick Metrics', style: theme.textTheme.titleMedium),
+            // Metric Summary Cards (Real API Data)
+            Text('Live Institution Metrics', style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
             Row(
               children: [
-                _buildMetricCard(context, 'Total Students', '840', Icons.people_outline, AppColors.primary),
+                _buildMetricCard(context, 'Total Students', totalStudents, Icons.people_outline, AppColors.primary),
                 const SizedBox(width: 12),
-                _buildMetricCard(context, 'Classes', '24', Icons.meeting_room_outlined, AppColors.secondary),
+                _buildMetricCard(context, 'Classes', totalClasses, Icons.meeting_room_outlined, AppColors.secondary),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                _buildMetricCard(context, 'Teachers', '42', Icons.badge_outlined, AppColors.roleTeacher),
+                _buildMetricCard(context, 'Homework', totalHomework, Icons.assignment_outlined, AppColors.roleTeacher),
                 const SizedBox(width: 12),
-                _buildMetricCard(context, 'Notices', '18', Icons.campaign_outlined, AppColors.accent),
+                _buildMetricCard(context, 'Notices', totalNotices, Icons.campaign_outlined, AppColors.accent),
               ],
             ),
             const SizedBox(height: 24),
@@ -103,7 +127,7 @@ class AdminDashboardScreen extends StatelessWidget {
               context: context,
               icon: Icons.campaign_rounded,
               title: 'Broadcast Announcement',
-              subtitle: 'Send instant notification to parents or teachers',
+              subtitle: 'Send instant circular to parents or teachers',
               color: AppColors.accent,
               onTap: () => context.push('/announcements'),
             ),
@@ -111,7 +135,7 @@ class AdminDashboardScreen extends StatelessWidget {
             _buildActionTile(
               context: context,
               icon: Icons.menu_book_rounded,
-              title: 'Monitor Homework',
+              title: 'Manage Homework',
               subtitle: 'Review assignments and submissions across classes',
               color: AppColors.primary,
               onTap: () => context.push('/homework'),
@@ -120,14 +144,10 @@ class AdminDashboardScreen extends StatelessWidget {
             _buildActionTile(
               context: context,
               icon: Icons.person_add_alt_1_rounded,
-              title: 'Student & Teacher Directory',
-              subtitle: 'Manage enrollments and classroom assignments',
+              title: 'Student Directory',
+              subtitle: 'Enroll and manage students in school classes',
               color: AppColors.roleParent,
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Directory management will connect to backend API.')),
-                );
-              },
+              onTap: () => context.push('/students'),
             ),
           ],
         ),
@@ -144,6 +164,7 @@ class AdminDashboardScreen extends StatelessWidget {
   ) {
     return Expanded(
       child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -152,17 +173,17 @@ class AdminDashboardScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: color, size: 22),
+                child: Icon(icon, color: color, size: 20),
               ),
               const SizedBox(height: 12),
               Text(
                 count,
                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 label,
                 style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
@@ -183,18 +204,19 @@ class AdminDashboardScreen extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: color),
+          child: Icon(icon, color: color, size: 22),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textMuted),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textMuted),
         onTap: onTap,
       ),
     );

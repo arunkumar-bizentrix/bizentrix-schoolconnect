@@ -11,12 +11,26 @@ class ClassAndStudentAPITests(APITestCase):
     def setUp(self):
         # Create two distinct schools
         self.school_a = School.objects.create(
-            name="ABC Matriculation School",
-            code="ABC001",
+            name="Vivekananda School, Bagalur",
+            code="VIV001",
         )
         self.school_b = School.objects.create(
             name="XYZ International School",
             code="XYZ002",
+        )
+
+        # Create Admins
+        self.admin_a = User.objects.create_user(
+            username="admin_a",
+            password="Password@123",
+            role=User.Role.ADMIN,
+            school=self.school_a,
+        )
+        self.admin_b = User.objects.create_user(
+            username="admin_b",
+            password="Password@123",
+            role=User.Role.ADMIN,
+            school=self.school_b,
         )
 
         # Create teachers belonging to each school
@@ -33,6 +47,46 @@ class ClassAndStudentAPITests(APITestCase):
             school=self.school_b,
         )
 
+        # Classes in School A
+        self.class_a1 = Class.objects.create(
+            school=self.school_a,
+            name="Grade 5",
+            section="A",
+            academic_year="2026-2027",
+        )
+        self.class_a1.teachers.add(self.teacher_a)
+
+        self.class_a2 = Class.objects.create(
+            school=self.school_a,
+            name="Grade 8",
+            section="B",
+            academic_year="2026-2027",
+        )
+
+        # Class in School B
+        self.class_b1 = Class.objects.create(
+            school=self.school_b,
+            name="Grade 10",
+            section="A",
+            academic_year="2026-2027",
+        )
+
+        # Students
+        self.student_a1 = Student.objects.create(
+            school=self.school_a,
+            admission_number="STU-001",
+            first_name="Aarav",
+            last_name="Sharma",
+            class_enrolled=self.class_a1,
+        )
+        self.student_a2 = Student.objects.create(
+            school=self.school_a,
+            admission_number="STU-002",
+            first_name="Diya",
+            last_name="Rao",
+            class_enrolled=self.class_a2,
+        )
+
     def test_unauthenticated_requests_are_rejected(self):
         response = self.client.get('/api/v1/classes/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -40,107 +94,127 @@ class ClassAndStudentAPITests(APITestCase):
         response = self.client.get('/api/v1/students/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_create_and_list_classes_with_tenant_isolation(self):
-        # Teacher A creates a class in School A
+    def test_admin_can_create_and_manage_classes_and_students(self):
+        # Admin A creates class in School A
+        self.client.force_authenticate(user=self.admin_a)
+        res_class = self.client.post('/api/v1/classes/', {
+            'name': 'Grade 12',
+            'section': 'C',
+            'academic_year': '2026-2027',
+        })
+        self.assertEqual(res_class.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_class.data['school'], self.school_a.id)
+
+        # Admin A creates student
+        res_stu = self.client.post('/api/v1/students/', {
+            'admission_number': 'STU-003',
+            'first_name': 'Kavita',
+            'last_name': 'Patel',
+            'class_enrolled': self.class_a1.id,
+        })
+        self.assertEqual(res_stu.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_stu.data['school'], self.school_a.id)
+
+    def test_teacher_can_create_class(self):
         self.client.force_authenticate(user=self.teacher_a)
-        res_a = self.client.post('/api/v1/classes/', {
-            'name': 'Grade 5',
+        response = self.client.post('/api/v1/classes/', {
+            'name': 'Grade 7',
             'section': 'A',
             'academic_year': '2026-2027',
         })
-        self.assertEqual(res_a.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(res_a.data['school'], self.school_a.id)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn(self.teacher_a.id, response.data['teachers'])
 
-        # Teacher B creates a class in School B
-        self.client.force_authenticate(user=self.teacher_b)
-        res_b = self.client.post('/api/v1/classes/', {
-            'name': 'Grade 10',
-            'section': 'B',
+    def test_teacher_can_manage_assigned_class(self):
+        self.client.force_authenticate(user=self.teacher_a)
+        # Update assigned class
+        patch_res = self.client.patch(f'/api/v1/classes/{self.class_a1.id}/', {
+            'name': 'Grade 5 Renamed',
+        })
+        self.assertEqual(patch_res.status_code, status.HTTP_200_OK)
+
+        # Cannot modify unassigned class
+        patch_unassigned = self.client.patch(f'/api/v1/classes/{self.class_a2.id}/', {
+            'name': 'Grade 8 Renamed',
+        })
+        self.assertIn(patch_unassigned.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND])
+
+        # Delete assigned class
+        delete_res = self.client.delete(f'/api/v1/classes/{self.class_a1.id}/')
+        self.assertEqual(delete_res.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_teacher_sees_only_assigned_classes(self):
+        self.client.force_authenticate(user=self.teacher_a)
+        response = self.client.get('/api/v1/classes/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data.get('results', response.data)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['id'], self.class_a1.id)
+        self.assertEqual(results[0]['name'], 'Grade 5')
+
+    def test_teacher_can_create_student_in_assigned_class(self):
+        self.client.force_authenticate(user=self.teacher_a)
+        response = self.client.post('/api/v1/students/', {
+            'admission_number': 'STU-004',
+            'first_name': 'Rohan',
+            'last_name': 'Mehta',
+            'class_enrolled': self.class_a1.id,
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Cannot add student to unassigned class
+        response_unassigned = self.client.post('/api/v1/students/', {
+            'admission_number': 'STU-005',
+            'first_name': 'Sneha',
+            'last_name': 'Reddy',
+            'class_enrolled': self.class_a2.id,
+        })
+        self.assertEqual(response_unassigned.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_teacher_can_manage_student_in_assigned_class(self):
+        self.client.force_authenticate(user=self.teacher_a)
+        # Update student in assigned class
+        patch_res = self.client.patch(f'/api/v1/students/{self.student_a1.id}/', {
+            'last_name': 'Updated',
+        })
+        self.assertEqual(patch_res.status_code, status.HTTP_200_OK)
+
+        # Cannot update student in unassigned class
+        patch_unassigned = self.client.patch(f'/api/v1/students/{self.student_a2.id}/', {
+            'last_name': 'Hacked',
+        })
+        self.assertIn(patch_unassigned.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND])
+
+    def test_teacher_cannot_enroll_student_in_unassigned_class(self):
+        self.client.force_authenticate(user=self.teacher_a)
+        response = self.client.post(f'/api/v1/students/{self.student_a1.id}/enrollments/', {
+            'classroom': self.class_a2.id,
             'academic_year': '2026-2027',
+            'is_current': True,
         })
-        self.assertEqual(res_b.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(res_b.data['school'], self.school_b.id)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        # Teacher A lists classes -> must only see School A's class
+    def test_teacher_sees_only_students_in_assigned_classes(self):
         self.client.force_authenticate(user=self.teacher_a)
-        list_a = self.client.get('/api/v1/classes/')
-        self.assertEqual(list_a.status_code, status.HTTP_200_OK)
-        # Results can be a list or paginated dict
-        results_a = list_a.data.get('results', list_a.data)
-        self.assertEqual(len(results_a), 1)
-        self.assertEqual(results_a[0]['name'], 'Grade 5')
+        response = self.client.get('/api/v1/students/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data.get('results', response.data)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['id'], self.student_a1.id)
+        self.assertEqual(results[0]['admission_number'], 'STU-001')
 
-        # Teacher B lists classes -> must only see School B's class
-        self.client.force_authenticate(user=self.teacher_b)
-        list_b = self.client.get('/api/v1/classes/')
-        self.assertEqual(list_b.status_code, status.HTTP_200_OK)
-        results_b = list_b.data.get('results', list_b.data)
-        self.assertEqual(len(results_b), 1)
-        self.assertEqual(results_b[0]['name'], 'Grade 10')
-
-    def test_create_and_manage_students_with_tenant_isolation(self):
-        # Setup classes
-        class_a = Class.objects.create(
-            school=self.school_a,
-            name='Grade 6',
-            section='B',
-            academic_year='2026-2027',
-        )
-        class_b = Class.objects.create(
-            school=self.school_b,
-            name='Grade 7',
-            section='A',
-            academic_year='2026-2027',
-        )
-
-        # Teacher A creates student in School A
-        self.client.force_authenticate(user=self.teacher_a)
-        create_res = self.client.post('/api/v1/students/', {
-            'admission_number': 'STU-001',
-            'first_name': 'Aarav',
-            'last_name': 'Sharma',
-            'date_of_birth': '2014-05-12',
-            'class_enrolled': class_a.id,
-        })
-        self.assertEqual(create_res.status_code, status.HTTP_201_CREATED)
-        student_id = create_res.data['id']
-        self.assertEqual(create_res.data['school'], self.school_a.id)
-
-        # Teacher B attempts to view or list students -> receives 0 students
-        self.client.force_authenticate(user=self.teacher_b)
-        list_res = self.client.get('/api/v1/students/')
-        self.assertEqual(list_res.status_code, status.HTTP_200_OK)
-        results = list_res.data.get('results', list_res.data)
-        self.assertEqual(len(results), 0)
-
-        # Teacher B attempts to retrieve Teacher A's student directly -> 404 Not Found
-        retrieve_res = self.client.get(f'/api/v1/students/{student_id}/')
+        # Attempt retrieve of unassigned class student -> 404
+        retrieve_res = self.client.get(f'/api/v1/students/{self.student_a2.id}/')
         self.assertEqual(retrieve_res.status_code, status.HTTP_404_NOT_FOUND)
 
-        # Teacher A retrieves and updates their own student -> 200 OK
-        self.client.force_authenticate(user=self.teacher_a)
-        update_res = self.client.patch(f'/api/v1/students/{student_id}/', {
-            'last_name': 'Kumar',
-        })
-        self.assertEqual(update_res.status_code, status.HTTP_200_OK)
-        self.assertEqual(update_res.data['last_name'], 'Kumar')
-
     def test_prevent_cross_tenant_class_assignment(self):
-        # Class in School A
-        class_a = Class.objects.create(
-            school=self.school_a,
-            name='Grade 1',
-            section='A',
-            academic_year='2026-2027',
-        )
-
-        # Teacher B from School B attempts to enroll student into Class from School A
-        self.client.force_authenticate(user=self.teacher_b)
+        # Admin B from School B attempts to enroll student into Class from School A
+        self.client.force_authenticate(user=self.admin_b)
         response = self.client.post('/api/v1/students/', {
             'admission_number': 'STU-999',
             'first_name': 'Sneha',
             'last_name': 'Patel',
-            'class_enrolled': class_a.id,
+            'class_enrolled': self.class_a1.id,
         })
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('class_enrolled', response.data)

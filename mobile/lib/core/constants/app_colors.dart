@@ -46,6 +46,7 @@ class AppColors {
   // Priority Badges (Announcements)
   static const Color priorityUrgentText = Color(0xFFDC2626); // Red
   static const Color priorityUrgentBg = Color(0xFFFEE2E2);
+  static const Color priorityUrgentBorder = Color(0xFFFCA5A5);
 
   static const Color priorityImportantText = Color(0xFF7C3AED); // Purple
   static const Color priorityImportantBg = Color(0xFFEDE9FE);
@@ -56,6 +57,7 @@ class AppColors {
   // Status Chips
   static const Color statusActiveText = Color(0xFF15803D);
   static const Color statusActiveBg = Color(0xFFDCFCE7);
+  static const Color statusActiveBorder = Color(0xFF86EFAC);
 
   static const Color statusOverdueText = Color(0xFFDC2626);
   static const Color statusOverdueBg = Color(0xFFFEE2E2);

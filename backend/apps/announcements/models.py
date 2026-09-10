@@ -64,6 +64,12 @@ class Announcement(models.Model):
         ordering = ['-published_at', '-created_at']
         verbose_name = 'Announcement'
         verbose_name_plural = 'Announcements'
+        indexes = [
+            models.Index(fields=['school', 'published_at']),
+            models.Index(fields=['school', 'priority']),
+            models.Index(fields=['school', 'audience_type']),
+            models.Index(fields=['school', 'is_active']),
+        ]
 
     def clean(self):
         super().clean()
@@ -75,6 +81,11 @@ class Announcement(models.Model):
         elif self.audience_type == self.AudienceType.SCHOOL:
             if self.target_class is not None:
                 raise ValidationError({'target_class': "Target class must be null when audience type is SCHOOL."})
+
+    def save(self, *args, **kwargs):
+        if self.target_class and not self.school_id:
+            self.school = self.target_class.school
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"[{self.priority}] {self.title} ({self.audience_type})"

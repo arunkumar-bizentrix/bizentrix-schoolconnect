@@ -72,3 +72,5 @@ staticfiles/
 *.mo
 coverage/
 htmlcov/
+scratch/
+scratch_*.py

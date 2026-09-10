@@ -27,6 +27,9 @@ urlpatterns = [
 
     # Announcements & Circulars Endpoints
     path('api/v1/', include('apps.announcements.urls')),
+
+    # In-App Notifications Endpoints
+    path('api/v1/', include('apps.notifications.urls')),
 ]
 
 if settings.DEBUG:

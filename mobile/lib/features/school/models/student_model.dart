@@ -1,3 +1,5 @@
+import '../../../core/constants/app_constants.dart';
+
 class StudentModel {
   final int id;
   final String admissionNumber;
@@ -6,6 +8,7 @@ class StudentModel {
   final String fullName;
   final int? classId;
   final String className;
+  final String academicYear;
   final bool isActive;
 
   const StudentModel({
@@ -16,6 +19,7 @@ class StudentModel {
     required this.fullName,
     this.classId,
     required this.className,
+    this.academicYear = AppConstants.currentAcademicYear,
     this.isActive = true,
   });
 
@@ -24,14 +28,24 @@ class StudentModel {
     final last = json['last_name'] ?? '';
     final full = json['full_name'] ?? '$first $last'.trim();
 
+    int? cId;
+    if (json['class_enrolled'] is int) {
+      cId = json['class_enrolled'];
+    } else if (json['class_enrolled'] is Map) {
+      cId = json['class_enrolled']['id'];
+    } else if (json['class_enrolled'] != null) {
+      cId = int.tryParse(json['class_enrolled'].toString());
+    }
+
     return StudentModel(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       admissionNumber: json['admission_number'] ?? 'ADM000',
       firstName: first,
       lastName: last,
       fullName: full.isEmpty ? 'Student' : full,
-      classId: json['class_enrolled'] is int ? json['class_enrolled'] : null,
-      className: json['class_name'] ?? 'Grade 5 - A',
+      classId: cId,
+      className: json['class_name'] ?? json['class_enrolled_name'] ?? 'Class',
+      academicYear: json['academic_year'] ?? AppConstants.currentAcademicYear,
       isActive: json['is_active'] ?? true,
     );
   }
@@ -45,6 +59,7 @@ class StudentModel {
       'full_name': fullName,
       'class_enrolled': classId,
       'class_name': className,
+      'academic_year': academicYear,
       'is_active': isActive,
     };
   }

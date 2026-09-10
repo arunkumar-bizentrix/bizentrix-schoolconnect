@@ -1,3 +1,5 @@
+import '../../../core/constants/app_constants.dart';
+
 class ClassModel {
   final int id;
   final String name;
@@ -14,8 +16,8 @@ class ClassModel {
     required this.section,
     required this.academicYear,
     required this.displayName,
-    this.teacherName = 'Priya Sharma',
-    this.studentCount = 32,
+    this.teacherName = 'Not Assigned',
+    this.studentCount = 0,
     this.isActive = true,
   });
 
@@ -26,14 +28,25 @@ class ClassModel {
     final sectionStr = json['section'] ?? '';
     final display = json['display_name'] ?? '$nameStr - $sectionStr';
 
+    String teacher = 'Not Assigned';
+    if (json['teacher_names'] is List && (json['teacher_names'] as List).isNotEmpty) {
+      teacher = (json['teacher_names'] as List).join(', ');
+    } else if (json['teacher_name'] != null && json['teacher_name'].toString().isNotEmpty) {
+      teacher = json['teacher_name'].toString();
+    }
+
+    final count = json['student_count'] is int
+        ? json['student_count'] as int
+        : int.tryParse(json['student_count']?.toString() ?? '0') ?? 0;
+
     return ClassModel(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       name: nameStr,
       section: sectionStr,
-      academicYear: json['academic_year'] ?? '2025-2026',
+      academicYear: json['academic_year'] ?? AppConstants.currentAcademicYear,
       displayName: display,
-      teacherName: json['teacher_name'] ?? 'Priya Sharma',
-      studentCount: json['student_count'] ?? (sectionStr == 'A' ? 32 : 16),
+      teacherName: teacher,
+      studentCount: count,
       isActive: json['is_active'] ?? true,
     );
   }

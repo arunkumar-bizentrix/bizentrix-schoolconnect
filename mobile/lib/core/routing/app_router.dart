@@ -4,12 +4,32 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/dashboard/presentation/main_nav_scaffold.dart';
 import '../../features/homework/presentation/create_homework_screen.dart';
+import '../../features/homework/presentation/homework_list_screen.dart';
+import '../../features/announcements/presentation/announcements_list_screen.dart';
 import '../../features/announcements/presentation/announcement_detail_screen.dart';
 import '../../features/announcements/models/announcement_model.dart';
+import '../providers/school_providers.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
+  // Re-evaluate redirects whenever the auth state changes (login/logout/restore).
+  final refreshNotifier = ValueNotifier<int>(0);
+  ref.listen(authProvider, (previous, next) {
+    refreshNotifier.value++;
+  });
+  ref.onDispose(refreshNotifier.dispose);
+
   return GoRouter(
     initialLocation: '/login',
+    refreshListenable: refreshNotifier,
+    redirect: (context, state) {
+      final auth = ref.read(authProvider);
+      final loggedIn = auth.isAuthenticated;
+      final isOnLogin = state.matchedLocation == '/login';
+
+      if (!loggedIn && !isOnLogin) return '/login';
+      if (loggedIn && isOnLogin) return '/dashboard';
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/login',
@@ -24,8 +44,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const MainNavScaffold(),
       ),
       GoRoute(
+        path: '/homework',
+        builder: (context, state) => const HomeworkListScreen(),
+      ),
+      GoRoute(
         path: '/homework/create',
         builder: (context, state) => const CreateHomeworkScreen(),
+      ),
+      GoRoute(
+        path: '/announcements',
+        builder: (context, state) => const AnnouncementsListScreen(),
       ),
       GoRoute(
         path: '/announcements/detail',
@@ -34,22 +62,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           if (extra is AnnouncementModel) {
             return AnnouncementDetailScreen(announcement: extra);
           }
-          // Default fallback matching mockup 8
-          return AnnouncementDetailScreen(
-            announcement: AnnouncementModel(
-              id: 1,
-              title: 'Exam Schedule Released',
-              content:
-                  'Dear Students and Parents,\n\nThe final exam schedule for Grade 5 - A has been released. Please check the attached timetable and make the necessary preparations.\n\nBest regards,\nSchool Administration',
-              priority: 'URGENT',
-              audienceType: 'CLASS',
-              targetClassId: 1,
-              targetClassName: 'Grade 5 - A',
-              createdByName: 'Priya Sharma (Teacher)',
-              publishedAt: DateTime.now().subtract(const Duration(hours: 4)),
-              attachmentUrl: 'https://example.com/exam_schedule.pdf',
-            ),
-          );
+          return const AnnouncementDetailPlaceholderScreen();
         },
       ),
     ],
@@ -60,3 +73,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
+
+/// Shown when /announcements/detail is opened without an announcement object
+/// (e.g. deep link). Real entries always pass the model via `extra`.
+class AnnouncementDetailPlaceholderScreen extends StatelessWidget {
+  const AnnouncementDetailPlaceholderScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Announcement')),
+      body: const Center(child: Text('No announcement selected.')),
+    );
+  }
+}

@@ -7,8 +7,10 @@ from .validators import validate_announcement_attachment
 class AnnouncementSerializer(serializers.ModelSerializer):
     school_name = serializers.CharField(source='school.name', read_only=True)
     target_class_name = serializers.CharField(source='target_class.__str__', read_only=True)
+    academic_year = serializers.CharField(source='target_class.academic_year', read_only=True)
     created_by_name = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
+    is_active = serializers.BooleanField(default=True, required=False)
 
     class Meta:
         model = Announcement
@@ -27,6 +29,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             'audience_type',
             'target_class',
             'target_class_name',
+            'academic_year',
             'is_active',
             'created_at',
             'updated_at',

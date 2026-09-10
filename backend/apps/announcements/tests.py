@@ -13,8 +13,8 @@ class AnnouncementAPITests(APITestCase):
     def setUp(self):
         # Create two distinct schools
         self.school_a = School.objects.create(
-            name="ABC Matriculation School",
-            code="ABC001",
+            name="Vivekananda School, Bagalur",
+            code="VIV001",
         )
         self.school_b = School.objects.create(
             name="XYZ International School",
@@ -62,6 +62,9 @@ class AnnouncementAPITests(APITestCase):
             role=User.Role.PARENT,
             school=self.school_a,
         )
+
+        # Assign Teacher A to Class A1 only
+        self.class_a1.teachers.add(self.teacher_a)
 
         # Users in School B
         self.teacher_b = User.objects.create_user(
@@ -113,16 +116,118 @@ class AnnouncementAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['target_class'], self.class_a1.id)
 
-    def test_teacher_can_create_announcement_in_own_school(self):
+    def test_teacher_cannot_create_school_wide_announcement(self):
+        self.client.force_authenticate(user=self.teacher_a)
+        response = self.client.post('/api/v1/announcements/', {
+            'title': 'School Wide Notice by Teacher',
+            'content': 'Should be rejected.',
+            'priority': 'NORMAL',
+            'audience_type': 'SCHOOL',
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_teacher_can_create_announcement_for_assigned_class(self):
         self.client.force_authenticate(user=self.teacher_a)
         response = self.client.post('/api/v1/announcements/', {
             'title': 'Math Olympiad Registration',
             'content': 'Interested students please submit names by Friday.',
             'priority': 'NORMAL',
-            'audience_type': 'SCHOOL',
+            'audience_type': 'CLASS',
+            'target_class': self.class_a1.id,
         })
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['school'], self.school_a.id)
+        self.assertEqual(response.data['target_class'], self.class_a1.id)
+
+    def test_teacher_cannot_create_announcement_for_unassigned_class(self):
+        self.client.force_authenticate(user=self.teacher_a)
+        response = self.client.post('/api/v1/announcements/', {
+            'title': 'Class 8 Announcement',
+            'content': 'Should be rejected as unassigned.',
+            'priority': 'NORMAL',
+            'audience_type': 'CLASS',
+            'target_class': self.class_a2.id,
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_teacher_can_update_and_delete_assigned_class_announcement(self):
+        ann = Announcement.objects.create(
+            school=self.school_a,
+            title='Initial Title',
+            content='Initial Content',
+            priority='NORMAL',
+            audience_type='CLASS',
+            target_class=self.class_a1,
+            created_by=self.teacher_a,
+        )
+
+        self.client.force_authenticate(user=self.teacher_a)
+        update_res = self.client.patch(f'/api/v1/announcements/{ann.id}/', {
+            'title': 'Updated Title',
+        })
+        self.assertEqual(update_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(update_res.data['title'], 'Updated Title')
+
+        delete_res = self.client.delete(f'/api/v1/announcements/{ann.id}/')
+        self.assertEqual(delete_res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Announcement.objects.filter(id=ann.id).exists())
+
+    def test_teacher_cannot_update_or_delete_unassigned_class_announcement(self):
+        ann = Announcement.objects.create(
+            school=self.school_a,
+            title='Class 8 Note',
+            content='Created by admin.',
+            priority='NORMAL',
+            audience_type='CLASS',
+            target_class=self.class_a2,
+            created_by=self.admin_a,
+        )
+
+        self.client.force_authenticate(user=self.teacher_a)
+        update_res = self.client.patch(f'/api/v1/announcements/{ann.id}/', {
+            'title': 'Hacked Notice',
+        })
+        self.assertIn(update_res.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND])
+
+        delete_res = self.client.delete(f'/api/v1/announcements/{ann.id}/')
+        self.assertIn(delete_res.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND])
+
+    def test_teacher_can_view_school_wide_and_assigned_class_announcements(self):
+        school_ann = Announcement.objects.create(
+            school=self.school_a,
+            title='School Holiday',
+            content='Tomorrow is holiday.',
+            priority='IMPORTANT',
+            audience_type='SCHOOL',
+            created_by=self.admin_a,
+        )
+        assigned_ann = Announcement.objects.create(
+            school=self.school_a,
+            title='Class 5 Notice',
+            content='Homework due.',
+            priority='NORMAL',
+            audience_type='CLASS',
+            target_class=self.class_a1,
+            created_by=self.teacher_a,
+        )
+        unassigned_ann = Announcement.objects.create(
+            school=self.school_a,
+            title='Class 8 Notice',
+            content='Private to Class 8.',
+            priority='NORMAL',
+            audience_type='CLASS',
+            target_class=self.class_a2,
+            created_by=self.admin_a,
+        )
+
+        self.client.force_authenticate(user=self.teacher_a)
+        response = self.client.get('/api/v1/announcements/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data.get('results', response.data)
+        ids = [item['id'] for item in results]
+        self.assertIn(school_ann.id, ids)
+        self.assertIn(assigned_ann.id, ids)
+        self.assertNotIn(unassigned_ann.id, ids)
 
     def test_teacher_cannot_target_another_schools_class(self):
         self.client.force_authenticate(user=self.teacher_a)
@@ -179,7 +284,7 @@ class AnnouncementAPITests(APITestCase):
             priority='NORMAL',
             audience_type='CLASS',
             target_class=self.class_a2,
-            created_by=self.teacher_a,
+            created_by=self.admin_a,
         )
         self.client.force_authenticate(user=self.parent_a)
         response = self.client.get('/api/v1/announcements/')

@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "com.example.school_connect"
     compileSdk = flutter.compileSdkVersion
+    buildToolsVersion = "36.0.0"
     ndkVersion = "28.2.13676358"
 
     compileOptions {
