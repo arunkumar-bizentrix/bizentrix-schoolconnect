@@ -30,7 +30,6 @@ class AppConstants {
   static const String refreshTokenKey = 'jwt_refresh_token';
   static const String userRoleKey = 'current_user_role';
   static const String userProfileKey = 'user_profile_data';
-  static const String baseUrlOverrideKey = 'custom_api_base_url';
 
   // Timeouts
   static const Duration connectTimeout = Duration(seconds: 15);

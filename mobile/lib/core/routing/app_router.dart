@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../features/auth/presentation/login_screen.dart';
-import '../../features/dashboard/presentation/main_nav_scaffold.dart';
-import '../../features/homework/presentation/create_homework_screen.dart';
-import '../../features/homework/presentation/homework_list_screen.dart';
-import '../../features/announcements/presentation/announcements_list_screen.dart';
-import '../../features/announcements/presentation/announcement_detail_screen.dart';
+import '../../features/auth/screens/login_screen.dart';
+import '../../features/dashboard/screens/main_nav_scaffold.dart';
+import '../../features/homework/screens/create_homework_screen.dart';
+import '../../features/homework/screens/homework_list_screen.dart';
+import '../../features/announcements/screens/announcements_list_screen.dart';
+import '../../features/announcements/screens/announcement_detail_screen.dart';
 import '../../features/announcements/models/announcement_model.dart';
-import '../providers/school_providers.dart';
+import '../../features/auth/providers/auth_provider.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   // Re-evaluate redirects whenever the auth state changes (login/logout/restore).

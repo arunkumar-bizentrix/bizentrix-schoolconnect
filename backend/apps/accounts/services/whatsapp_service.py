@@ -21,7 +21,8 @@ class WhatsAppService:
 
     2. LOCAL DEVELOPMENT MODE:
        When Meta credentials are NOT configured AND settings.DEBUG is True,
-       uses local development fallback and displays the OTP in the Django console.
+       the send is a no-op that reports success. The OTP is NEVER printed or
+       logged - look it up in the OTPVerification table if you need it.
     """
 
     @classmethod
@@ -178,23 +179,16 @@ class WhatsAppService:
                 }
 
         # ═════════════════════════════════════════════════════════════════════
-        # 2. LOCAL DEVELOPMENT MODE: Console Display (Only when not in live mode)
+        # 2. LOCAL DEVELOPMENT MODE: no delivery, no OTP disclosure
         # ═════════════════════════════════════════════════════════════════════
         if getattr(settings, 'DEBUG', False):
-            box = f"""
-+---------------------------------------------------------------+
-|                   WHATSAPP OTP DISPATCHED                     |
-|  To Phone:   +{formatted_recipient:<48}|
-|  OTP Code:   {raw_otp:<48}|
-|  Validity:   5 Minutes (Expires in 300 seconds)               |
-|  Mode:       Development / Local Test Sandbox                 |
-+---------------------------------------------------------------+
-"""
-            try:
-                print(box)
-            except Exception:
-                pass
-            logger.info(f"[DEV] WhatsApp OTP for +{formatted_recipient}: {raw_otp}")
+            # Local development has no WhatsApp delivery. The OTP is never
+            # printed or logged - retrieve it from the OTPVerification row in
+            # the Django admin, or use the email OTP flow instead.
+            logger.info(
+                "[DEV] WhatsApp OTP generated for +%s (code withheld from logs)",
+                formatted_recipient,
+            )
 
             return {
                 "success": True,

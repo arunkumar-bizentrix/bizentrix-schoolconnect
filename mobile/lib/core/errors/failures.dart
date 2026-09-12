@@ -20,12 +20,3 @@ class NetworkFailure extends Failure {
 class AuthFailure extends Failure {
   const AuthFailure([super.message = 'Authentication failed. Please log in again.', super.statusCode = 401]);
 }
-
-class ValidationFailure extends Failure {
-  final Map<String, dynamic>? errors;
-  const ValidationFailure(String message, {this.errors}) : super(message, 400);
-}
-
-class CacheFailure extends Failure {
-  const CacheFailure([super.message = 'Failed to load cached data.']);
-}

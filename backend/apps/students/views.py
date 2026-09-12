@@ -1,8 +1,12 @@
-from django.db.models import Q
+from django.db.models import Count, Q
 from rest_framework import viewsets, permissions, filters, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
+
+from apps.accounts.models import User
+from apps.schools.services import attach_user_to_school, get_school_for
 
 from .models import Class, Student, StudentClassEnrollment, normalize_academic_year
 from .serializers import (
@@ -27,15 +31,13 @@ class ClassViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        from apps.schools.models import School
-        school = user.school or School.objects.first()
+        school = get_school_for(user)
 
-        if user.is_superuser and not user.school:
-            queryset = Class.objects.select_related('school').prefetch_related('teachers').all()
-        else:
-            queryset = Class.objects.select_related('school').prefetch_related('teachers').filter(
-                school=school
-            )
+        queryset = Class.objects.select_related('school').prefetch_related('teachers').annotate(
+            student_count=Count('students', filter=Q(students__is_active=True), distinct=True),
+        )
+        if not (user.is_superuser and not user.school):
+            queryset = queryset.filter(school=school)
 
         # Teachers only see classes assigned to them
         if user.role == 'TEACHER':
@@ -74,37 +76,24 @@ class ClassViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role not in ['ADMIN', 'TEACHER'] and not user.is_superuser:
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("You do not have permission to create classes.")
+        if user.role != 'ADMIN' and not user.is_superuser:
+            raise PermissionDenied("Only school administrators can create classes.")
 
-        from apps.schools.models import School
-        school = user.school or School.objects.first()
-        if not user.school and school and not user.is_superuser:
-            user.school = school
-            user.save(update_fields=['school'])
+        school = attach_user_to_school(user)
 
         extra = {}
         if 'is_active' not in serializer.validated_data:
             extra['is_active'] = True
 
         if user.is_superuser and 'school' in serializer.validated_data:
-            instance = serializer.save(**extra)
+            serializer.save(**extra)
         else:
-            instance = serializer.save(school=school, **extra)
-
-        # If created by a teacher, automatically assign the teacher to this class
-        if user.role == 'TEACHER':
-            instance.teachers.add(user)
+            serializer.save(school=school, **extra)
 
     def perform_destroy(self, instance):
         user = self.request.user
-        if user.role not in ['ADMIN', 'TEACHER'] and not user.is_superuser:
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("You do not have permission to delete classes.")
-        if user.role == 'TEACHER' and not instance.teachers.filter(id=user.id).exists():
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("You can only delete classes assigned to you.")
+        if user.role != 'ADMIN' and not user.is_superuser:
+            raise PermissionDenied("Only school administrators can delete classes.")
         instance.delete()
 
 
@@ -122,8 +111,7 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        from apps.schools.models import School
-        school = user.school or School.objects.first()
+        school = get_school_for(user)
 
         if user.is_superuser and not user.school:
             queryset = Student.objects.select_related(
@@ -198,26 +186,14 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role not in ['ADMIN', 'TEACHER'] and not user.is_superuser:
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("You do not have permission to create students.")
+        if user.role != 'ADMIN' and not user.is_superuser:
+            raise PermissionDenied("Only school administrators can add students.")
 
-        from apps.schools.models import School
-        school = user.school or School.objects.first()
-        if not user.school and school and not user.is_superuser:
-            user.school = school
-            user.save(update_fields=['school'])
+        school = attach_user_to_school(user)
 
         extra = {}
         if 'is_active' not in serializer.validated_data:
             extra['is_active'] = True
-
-        # If created by a teacher, verify that the student is being enrolled in a class assigned to this teacher
-        class_enrolled = serializer.validated_data.get('class_enrolled')
-        if user.role == 'TEACHER' and class_enrolled:
-            if not class_enrolled.teachers.filter(id=user.id).exists():
-                from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied("Teachers can only add students to their assigned classes.")
 
         if user.is_superuser and 'school' in serializer.validated_data:
             serializer.save(**extra)
@@ -226,13 +202,8 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         user = self.request.user
-        if user.role not in ['ADMIN', 'TEACHER'] and not user.is_superuser:
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("You do not have permission to delete students.")
-        if user.role == 'TEACHER':
-            if not instance.class_enrolled or not instance.class_enrolled.teachers.filter(id=user.id).exists():
-                from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied("Teachers can only remove students from their assigned classes.")
+        if user.role != 'ADMIN' and not user.is_superuser:
+            raise PermissionDenied("Only school administrators can remove students.")
         instance.delete()
 
     @action(detail=True, methods=['get', 'post'], url_path='enrollments')
@@ -249,9 +220,9 @@ class StudentViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         elif request.method == 'POST':
-            if request.user.role not in ['ADMIN', 'TEACHER'] and not request.user.is_superuser:
+            if request.user.role != 'ADMIN' and not request.user.is_superuser:
                 return Response(
-                    {"detail": "You do not have permission to manage class enrollments."},
+                    {"detail": "Only school administrators can manage class enrollments."},
                     status=status.HTTP_403_FORBIDDEN
                 )
 
@@ -262,12 +233,6 @@ class StudentViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
 
             classroom = serializer.validated_data['classroom']
-            if request.user.role == 'TEACHER' and not classroom.teachers.filter(id=request.user.id).exists():
-                return Response(
-                    {"detail": "Teachers can only enroll students into their assigned classes."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-
             academic_year = serializer.validated_data['academic_year']
 
             # Update current active class on student
@@ -304,7 +269,6 @@ class StudentViewSet(viewsets.ModelViewSet):
             )
 
         student = self.get_object()
-        from apps.accounts.models import User
 
         parent_id = request.data.get('parent_id')
         email = request.data.get('email')

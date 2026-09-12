@@ -5,6 +5,8 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from apps.schools.models import School
+from apps.schools.services import attach_user_to_school, get_default_school, get_school_id_for
+
 from .models import User, OTPVerification
 
 
@@ -78,9 +80,7 @@ class LoginSerializer(serializers.Serializer):
         if not user.is_active:
             raise serializers.ValidationError("User account is disabled.")
 
-        if not user.school and not user.is_superuser:
-            user.school = School.objects.first()
-            user.save(update_fields=['school'])
+        attach_user_to_school(user)
 
         refresh = RefreshToken.for_user(user)
 
@@ -206,9 +206,7 @@ class VerifyOTPSerializer(serializers.Serializer):
                 {'phone_number': "This user account is not active or not registered with a school."}
             )
 
-        if not user.school and not user.is_superuser:
-            user.school = School.objects.first()
-            user.save(update_fields=['school'])
+        attach_user_to_school(user)
 
         refresh = RefreshToken.for_user(user)
 
@@ -338,9 +336,7 @@ class VerifyEmailOTPSerializer(serializers.Serializer):
                 {'email': "This user account is deactivated."}
             )
 
-        if not user.school and not user.is_superuser:
-            user.school = School.objects.first()
-            user.save(update_fields=['school'])
+        attach_user_to_school(user)
 
         refresh = RefreshToken.for_user(user)
 
@@ -402,7 +398,7 @@ class RegisterSerializer(serializers.Serializer):
         if school_id:
             school = School.objects.filter(id=school_id).first()
         if not school:
-            school = School.objects.first()
+            school = get_default_school()
 
         # Generate clean, unique username
         if email:

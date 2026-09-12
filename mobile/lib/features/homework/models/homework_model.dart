@@ -2,8 +2,8 @@ import '../../../core/constants/app_constants.dart';
 
 class HomeworkModel {
   final int id;
-  final int? classroomId;
-  final String classroomName;
+  final int? classId;
+  final String className;
   final int? studentId;
   final String? studentName;
   final String subject;
@@ -18,8 +18,8 @@ class HomeworkModel {
 
   const HomeworkModel({
     required this.id,
-    this.classroomId,
-    required this.classroomName,
+    this.classId,
+    required this.className,
     this.studentId,
     this.studentName,
     required this.subject,
@@ -56,8 +56,8 @@ class HomeworkModel {
 
     return HomeworkModel(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
-      classroomId: cId,
-      classroomName: json['classroom_name'] ?? 'Class',
+      classId: cId,
+      className: json['classroom_name'] ?? 'Class',
       studentId: sId,
       studentName: json['student_name'],
       subject: json['subject'] ?? 'General',
@@ -75,8 +75,8 @@ class HomeworkModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'classroom': classroomId,
-      'classroom_name': classroomName,
+      'classroom': classId,
+      'classroom_name': className,
       'subject': subject,
       'title': title,
       'description': description,

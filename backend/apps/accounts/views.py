@@ -1,8 +1,10 @@
 import logging
 from rest_framework import status, permissions, parsers
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .models import OTPVerification
 from .services import WhatsAppService, EmailService
 from .serializers import (
@@ -18,12 +20,33 @@ from .serializers import (
 logger = logging.getLogger('schoolconnect.accounts')
 
 
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    """
+    POST /api/v1/auth/token/
+    SimpleJWT's credential endpoint, rate limited per client IP. This is the
+    endpoint the mobile app uses for password sign-in.
+    """
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
+
+
+class ThrottledTokenRefreshView(TokenRefreshView):
+    """
+    POST /api/v1/auth/token/refresh/
+    Rotates the access token. Throttled to stop refresh-token grinding.
+    """
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
+
+
 class LoginView(APIView):
     """
     POST /api/v1/auth/login/
     Authenticates user and returns JWT access/refresh tokens along with full profile.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -71,6 +94,8 @@ class SendEmailOTPView(APIView):
     - 60s cooldown and 10 req/hour rate limiting.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp'
 
     def post(self, request):
         serializer = SendEmailOTPSerializer(data=request.data)
@@ -124,6 +149,8 @@ class VerifyEmailOTPView(APIView):
     Verifies 6-digit OTP against stored hash and returns SimpleJWT access and refresh tokens.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp'
 
     def post(self, request):
         serializer = VerifyEmailOTPSerializer(data=request.data)
@@ -137,6 +164,8 @@ class SendOTPView(APIView):
     Dispatches a 6-digit WhatsApp OTP to a registered school user.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp'
 
     def post(self, request):
         serializer = SendOTPSerializer(data=request.data)
@@ -179,6 +208,8 @@ class VerifyOTPView(APIView):
     Verifies 6-digit OTP and issues SimpleJWT access + refresh tokens and user profile.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp'
 
     def post(self, request):
         serializer = VerifyOTPSerializer(data=request.data)
@@ -193,6 +224,8 @@ class RegisterView(APIView):
     dispatches a branded welcome email via real SMTP, and returns JWT auth tokens.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)

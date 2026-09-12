@@ -1,3 +1,5 @@
+/// Every backend route the app talks to, in one place.
+/// Keep this in sync with backend/config/urls.py and the app URL modules.
 class ApiEndpoints {
   // Authentication & Profile
   static const String login = '/auth/token/';
@@ -9,7 +11,6 @@ class ApiEndpoints {
   static const String authOtpEmailVerify = '/auth/otp/email/verify/';
 
   // School & Academic Structure
-  static const String schools = '/schools/';
   static const String classes = '/classes/';
   static String classDetail(dynamic id) => '/classes/$id/';
 
@@ -19,7 +20,6 @@ class ApiEndpoints {
   // Homework
   static const String homeworkList = '/homework/';
   static String homeworkDetail(dynamic id) => '/homework/$id/';
-  static String homeworkSubmissions(dynamic id) => '/homework/$id/submissions/';
 
   // Announcements
   static const String announcements = '/announcements/';
@@ -28,14 +28,10 @@ class ApiEndpoints {
   // Parent Children
   static const String parentChildren = '/parent/children/';
 
-  // Attachments
-  static const String uploadAttachment = '/attachments/upload/';
-
   // Notifications
   static const String notifications = '/notifications/';
   static String notificationRead(dynamic id) => '/notifications/$id/read/';
   static const String notificationsMarkAllRead = '/notifications/mark-all-read/';
   static const String notificationsUnreadCount = '/notifications/unread-count/';
-  static const String registerDevice = '/notifications/register-device/';
 }
 

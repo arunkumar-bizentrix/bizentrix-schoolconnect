@@ -1,12 +1,15 @@
 from rest_framework import permissions
 
+from apps.schools.services import get_school_for
+
 
 class IsHomeworkAuthorized(permissions.BasePermission):
     """
     Role-aware permissions for Homework:
-    - Admin: Full access within own school.
-    - Teacher: Read & write within own school.
-    - Parent: Read-only access strictly limited to classes where their children are enrolled.
+    - Admin: full access within the school.
+    - Teacher: read and write, limited to classes assigned to them.
+    - Parent: read-only, limited to homework for their children's classes
+      or addressed to one of their children individually.
     """
 
     message = "You do not have permission to perform this action."
@@ -19,13 +22,8 @@ class IsHomeworkAuthorized(permissions.BasePermission):
         if user.is_superuser:
             return True
 
-        if not user.school:
-            from apps.schools.models import School
-            user.school = School.objects.first()
-            if user.school:
-                user.save(update_fields=['school'])
-
-        if not user.school or not user.school.is_active:
+        school = get_school_for(user)
+        if not school or not school.is_active:
             return False
 
         # Read permissions allowed for all authenticated school members
@@ -40,12 +38,8 @@ class IsHomeworkAuthorized(permissions.BasePermission):
         if user.is_superuser:
             return True
 
-        if not user.school:
-            from apps.schools.models import School
-            user.school = School.objects.first()
-
         # Tenant boundary check
-        if obj.school != user.school:
+        if obj.school != get_school_for(user):
             return False
 
         # Parent can only view homework for classes their children attend or assigned to their child

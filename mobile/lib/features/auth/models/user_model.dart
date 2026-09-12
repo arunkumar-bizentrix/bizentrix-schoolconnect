@@ -37,26 +37,42 @@ class UserModel {
     }
 
     final role = UserRole.fromCode(json['role']?.toString());
-    final defaultAvatar = role == UserRole.admin
-        ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100'
-        : role == UserRole.parent
-            ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100'
-            : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100';
-
-    final customAvatar = json['profile_picture_url'] ?? json['profile_picture'] ?? json['avatar_url'];
+    final customAvatar =
+        json['profile_picture_url'] ?? json['profile_picture'] ?? json['avatar_url'];
 
     return UserModel(
       id: json['id']?.toString() ?? '',
       email: json['email'] ?? '',
-      fullName: json['full_name'] ?? json['username'] ?? '',
+      fullName: _firstNonBlank([json['full_name'], json['username']]),
       role: role,
       schoolId: schoolId,
       schoolName: schoolName,
       phoneNumber: json['phone_number'],
+      // Null when the user has not uploaded a picture. The UI renders
+      // initials in that case - it never falls back to a stock photo.
       avatarUrl: (customAvatar != null && customAvatar.toString().isNotEmpty)
           ? customAvatar.toString()
-          : defaultAvatar,
+          : null,
     );
+  }
+
+  static String _firstNonBlank(List<dynamic> candidates) {
+    for (final candidate in candidates) {
+      final value = candidate?.toString().trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+    return '';
+  }
+
+  /// Up to two initials derived from the user's name, for avatar placeholders.
+  String get initials {
+    final parts = fullName.trim().split(RegExp(r'\s+'))
+      ..removeWhere((part) => part.isEmpty);
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1)).toUpperCase();
   }
 
   UserModel copyWith({

@@ -2,6 +2,8 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.utils import timezone
+from django.core.cache import cache
+from rest_framework.throttling import SimpleRateThrottle
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 from rest_framework import status
@@ -945,3 +947,52 @@ class EmailOTPAuthenticationTests(TestCase):
         self.assertNotIn(raw_otp, str(verify_res.data))
 
 
+
+
+class AuthThrottlingTests(TestCase):
+    """
+    The credential endpoints are rate limited per client IP so that password
+    and refresh-token guessing is not free.
+
+    DRF binds SimpleRateThrottle.THROTTLE_RATES at import time, so the rate is
+    patched on the throttle class rather than through override_settings.
+    """
+
+    LOW_RATES = {'auth': '3/min', 'otp': '3/hour'}
+
+    def setUp(self):
+        self.client = APIClient()
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def _hammer(self, url, times=5):
+        payload = {'username': 'nobody', 'password': 'wrong-password'}
+        with patch.dict(SimpleRateThrottle.THROTTLE_RATES, self.LOW_RATES, clear=False):
+            return [
+                self.client.post(url, payload, format='json').status_code
+                for _ in range(times)
+            ]
+
+    def test_token_endpoint_throttles_repeated_credential_attempts(self):
+        statuses = self._hammer('/api/v1/auth/token/')
+        self.assertIn(status.HTTP_429_TOO_MANY_REQUESTS, statuses)
+
+    def test_login_endpoint_throttles_repeated_credential_attempts(self):
+        statuses = self._hammer('/api/v1/auth/login/')
+        self.assertIn(status.HTTP_429_TOO_MANY_REQUESTS, statuses)
+
+    def test_ordinary_data_endpoints_are_not_throttled(self):
+        """Throttling is scoped to credentials; listing data must stay unthrottled."""
+        school = School.objects.create(name="Throttle Test School", code="THR01")
+        user = User.objects.create_user(
+            username="throttle_reader",
+            password="Password@123",
+            role=User.Role.ADMIN,
+            school=school,
+        )
+        self.client.force_authenticate(user=user)
+        with patch.dict(SimpleRateThrottle.THROTTLE_RATES, self.LOW_RATES, clear=False):
+            statuses = [self.client.get('/api/v1/classes/').status_code for _ in range(6)]
+        self.assertNotIn(status.HTTP_429_TOO_MANY_REQUESTS, statuses)

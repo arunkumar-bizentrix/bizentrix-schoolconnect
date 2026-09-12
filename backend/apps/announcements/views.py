@@ -1,5 +1,8 @@
 from django.db.models import Q
 from rest_framework import viewsets, permissions, filters
+from rest_framework.exceptions import PermissionDenied
+from apps.notifications.services import NotificationService
+from apps.schools.services import attach_user_to_school, get_school_for
 from apps.students.models import Class, normalize_academic_year
 from .models import Announcement
 from .serializers import AnnouncementSerializer
@@ -21,8 +24,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        from apps.schools.models import School
-        school = user.school or School.objects.first()
+        school = get_school_for(user)
 
         if user.is_superuser and not user.school:
             queryset = Announcement.objects.select_related('school', 'target_class', 'created_by').all()
@@ -107,13 +109,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
-        from apps.schools.models import School
-        from rest_framework.exceptions import PermissionDenied
-
-        school = user.school or School.objects.first()
-        if not user.school and school and not user.is_superuser:
-            user.school = school
-            user.save(update_fields=['school'])
+        school = attach_user_to_school(user)
 
         audience_type = serializer.validated_data.get('audience_type', Announcement.AudienceType.SCHOOL)
         target_class = serializer.validated_data.get('target_class')
@@ -135,8 +131,4 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
             instance = serializer.save(school=school, **extra)
 
         # Dispatch real-time in-app notifications for target parents
-        try:
-            from apps.notifications.services import NotificationService
-            NotificationService.create_announcement_notifications(instance)
-        except Exception:
-            pass
+        NotificationService.create_announcement_notifications(instance)

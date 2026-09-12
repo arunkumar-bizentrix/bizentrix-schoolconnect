@@ -1,5 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
+
+from apps.schools.services import get_school_for
 from .models import Homework
 
 
@@ -65,7 +67,7 @@ class HomeworkSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
             user = request.user
-            if not user.is_superuser and value.school != user.school:
+            if not user.is_superuser and value.school != get_school_for(user):
                 raise serializers.ValidationError(
                     "Cannot assign homework to a class from another school."
                 )

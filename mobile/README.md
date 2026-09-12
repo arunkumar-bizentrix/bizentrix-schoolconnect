@@ -1,17 +1,40 @@
-# school_connect
+# SchoolConnect — Flutter app
 
-A new Flutter project.
+The mobile client for Bizentrix SchoolConnect. Android-first.
 
-## Getting Started
+See [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) for the layer rules,
+folder conventions and role model. The short version:
 
-This project is a starting point for a Flutter application.
+```
+Screen  →  Provider (Riverpod StateNotifier)  →  ApiClient (Dio)  →  Django API
+```
 
-A few resources to get you started if this is your first Flutter project:
+A screen never calls Dio, builds a URL, or holds a domain rule.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Run
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter pub get
+flutter run --dart-define=API_BASE_URL=http://192.168.0.6:8000/api/v1
+```
+
+Use `http://10.0.2.2:8000/api/v1` for the Android emulator.
+
+## Checks
+
+```bash
+flutter analyze
+flutter test          # hermetic: no backend needed
+flutter test test_live   # needs a running, seeded backend on :8000
+```
+
+## Layout
+
+```
+lib/
+├── core/       constants, errors, network, routing, storage, theme, utils
+├── features/   auth, dashboard, classes, students, homework,
+│               announcements, notifications, profile
+│               — each with models/, providers/, screens/
+└── shared/widgets/   widgets used by more than one feature
+```

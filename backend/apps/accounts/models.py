@@ -1,6 +1,12 @@
+import hashlib
+import hmac
+import secrets
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
 
 
 class User(AbstractUser):
@@ -95,7 +101,6 @@ class OTPVerification(models.Model):
         return f"[{self.channel}] OTP for {self.destination} ({status}) - Attempts: {self.attempts}/{self.max_attempts}"
 
     def is_expired(self):
-        from django.utils import timezone
         return timezone.now() > self.expires_at
 
     def verify_code(self, candidate_otp: str) -> bool:
@@ -103,10 +108,6 @@ class OTPVerification(models.Model):
         Verifies candidate OTP against stored hash using constant-time comparison.
         Increments attempts on failure. Enforces max_attempts. Marks as used on success.
         """
-        import hashlib
-        import hmac
-        from django.utils import timezone
-
         if self.is_used or self.is_expired() or self.attempts >= self.max_attempts:
             return False
 
@@ -143,11 +144,6 @@ class OTPVerification(models.Model):
         generates cryptographically secure 6-digit OTP, stores only the hash.
         Returns (record, raw_otp).
         """
-        import secrets
-        import hashlib
-        from datetime import timedelta
-        from django.utils import timezone
-
         now = timezone.now()
         clean_dest = str(destination).strip()
         if channel is None:

@@ -1,79 +1,93 @@
 # Bizentrix SchoolConnect
 
-Structured, role-based school communication and homework management platform (replacing scattered WhatsApp groups with an Android-first mobile app).
+Structured, role-based school communication and homework management for
+**Vivekananda School, Bagalur** — replacing scattered WhatsApp groups with an
+Android-first mobile app.
+
+> **Architecture, conventions and where to add things:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
-## 📱 Tech Stack
-- **Frontend**: Flutter (Android-first), Riverpod, GoRouter, Dio, Google Fonts
-- **Backend**: Python, Django, Django REST Framework (DRF)
+## Tech Stack
+
+- **Mobile**: Flutter (Android-first), Riverpod, GoRouter, Dio, Google Fonts
+- **Backend**: Python, Django 5.1, Django REST Framework, SimpleJWT
 - **Database**: PostgreSQL
-- **Push Notifications**: Firebase Cloud Messaging (FCM)
-- **File Storage**: S3-compatible storage (for homework sheets, circular PDFs, image attachments)
-- **Version Control**: Git
+- **Authentication**: JWT, with password, email OTP and WhatsApp OTP sign-in
+- **Notifications**: in-app (stored and polled). Push is not implemented yet.
+- **File storage**: local `MEDIA_ROOT` (homework attachments, circular PDFs,
+  profile pictures). Object storage is not wired up yet.
 
 ---
 
-## 🏗️ Project Architecture
+## Layout
 
 ```
 d:\school\
-├── mobile/                           # Flutter Mobile Application
-│   ├── pubspec.yaml                  # App dependencies & assets
-│   ├── analysis_options.yaml         # Linting configuration
-│   ├── assets/
-│   │   ├── icons/                    # App icons & SVGs
-│   │   └── images/                   # App logos & illustrations
-│   └── lib/
-│       ├── main.dart                 # Application entry point & ProviderScope
-│       ├── app.dart                  # MaterialApp.router configuration & theme
-│       ├── core/                     # Shared core utilities & infrastructure
-│       │   ├── constants/            # App constants, roles, and color tokens
-│       │   ├── errors/               # Failure & exception definitions
-│       │   ├── network/              # Dio client, auth interceptor & API endpoints
-│       │   ├── routing/              # GoRouter configuration & role navigation guards
-│       │   ├── storage/              # Secure token & session storage
-│       │   └── theme/                # Typography, light theme & UI components
-│       └── features/                 # Modular feature-first architecture
-│           ├── auth/                 # Role-based login & user models
-│           ├── dashboard/            # Admin, Teacher, and Parent dashboards
-│           ├── homework/             # Homework list & attachment previews
-│           └── announcements/        # School circulars & broadcast notices
-│
-├── backend/                          # Django REST Framework Backend (Phase 2)
-└── README.md
+├── backend/     Django REST API      (see docs/ARCHITECTURE.md §2)
+├── mobile/      Flutter app          (see docs/ARCHITECTURE.md §3)
+└── docs/        Architecture notes
 ```
 
 ---
 
-## 🚀 Getting Started with the Mobile App
+## Running the backend
 
-### Prerequisites
-1. **Flutter SDK**: Ensure Flutter 3.19+ is installed and added to your system's `PATH`.
-2. **Android Studio / Android SDK**: For running the Android emulator or deploying to a physical device.
+```bash
+cd backend
+python -m venv venv
+venv/Scripts/activate          # Windows;  source venv/bin/activate on Unix
+pip install -r requirements.txt
+cp .env.example .env           # then fill in DB and email credentials
+python manage.py migrate
+python manage.py seed_demo_users
+python manage.py runserver 0.0.0.0:8000
+```
 
-### Running the App
+## Running the app
+
 ```bash
 cd mobile
 flutter pub get
-flutter run
+flutter run --dart-define=API_BASE_URL=http://192.168.0.6:8000/api/v1
+```
+
+Replace the IP with your machine's LAN address (use `http://10.0.2.2:8000/api/v1`
+for the Android emulator). Without the define it falls back to the value in
+`lib/core/constants/app_constants.dart`.
+
+---
+
+## Tests
+
+```bash
+cd backend && python manage.py test
+```
+
+```bash
+cd mobile && flutter analyze && flutter test
+```
+
+`flutter test` is hermetic — no backend required. The API contract tests that
+*do* need a running, seeded backend are kept separate and run on demand:
+
+```bash
+cd mobile && flutter test test_live
 ```
 
 ---
 
-## 👥 Role Capabilities (MVP)
+## Roles
 
-1. **Admin**:
-   - Manage school details, teachers, students, and classes.
-   - Broadcast urgent and general announcements with PDF circulars.
-   - Overview metrics of classes and homework assignments.
+**Admin** — full management of classes, students, teachers, parents, homework,
+announcements and school settings.
 
-2. **Teacher**:
-   - Assign homework to specific classes with due dates and attachments (PDF/images).
-   - View student submissions.
-   - Receive school administration circulars.
+**Teacher** — reads their assigned classes and the students in them; creates and
+manages homework and class announcements for those classes. Teachers do not
+administer class or student records.
 
-3. **Parent**:
-   - Switch between enrolled children (multi-student support).
-   - View daily homework with subject badges, due dates, and downloadable attachments.
-   - View official school announcements and urgent notices.
+**Parent** — switches between their children; reads that child's homework, class
+notices and school circulars; receives notifications.
+
+The full capability matrix is in [docs/ARCHITECTURE.md §5](docs/ARCHITECTURE.md).
+The backend enforces it; the app only hides what a role cannot do.

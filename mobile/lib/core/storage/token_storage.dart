@@ -48,14 +48,6 @@ class TokenStorage {
     return await _storage.read(key: AppConstants.userProfileKey);
   }
 
-  Future<void> saveBaseUrlOverride(String url) async {
-    await _storage.write(key: AppConstants.baseUrlOverrideKey, value: url);
-  }
-
-  Future<String?> getBaseUrlOverride() async {
-    return await _storage.read(key: AppConstants.baseUrlOverrideKey);
-  }
-
   Future<void> clearAll() async {
     await _storage.deleteAll();
   }

@@ -1,5 +1,7 @@
 from rest_framework import permissions
 
+from apps.schools.services import get_school_for
+
 
 class IsAnnouncementAuthorized(permissions.BasePermission):
     """
@@ -20,13 +22,8 @@ class IsAnnouncementAuthorized(permissions.BasePermission):
         if user.is_superuser:
             return True
 
-        if not user.school:
-            from apps.schools.models import School
-            user.school = School.objects.first()
-            if user.school:
-                user.save(update_fields=['school'])
-
-        if not user.school or not user.school.is_active:
+        school = get_school_for(user)
+        if not school or not school.is_active:
             return False
 
         # Read permissions allowed for all authenticated school members
@@ -41,12 +38,8 @@ class IsAnnouncementAuthorized(permissions.BasePermission):
         if user.is_superuser:
             return True
 
-        if not user.school:
-            from apps.schools.models import School
-            user.school = School.objects.first()
-
         # Tenant boundary check
-        if obj.school != user.school:
+        if obj.school != get_school_for(user):
             return False
 
         # Parents have read-only access scoped to SCHOOL or child's CLASS

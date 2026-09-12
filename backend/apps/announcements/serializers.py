@@ -1,4 +1,6 @@
 from rest_framework import serializers
+
+from apps.schools.services import get_school_for
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import Announcement
 from .validators import validate_announcement_attachment
@@ -75,7 +77,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
                     'target_class': "Target class is required when audience type is CLASS."
                 })
             # Multi-tenant cross-school validation
-            if not user.is_superuser and target_class.school != user.school:
+            if not user.is_superuser and target_class.school != get_school_for(user):
                 raise serializers.ValidationError({
                     'target_class': "Target class must belong to the same school."
                 })

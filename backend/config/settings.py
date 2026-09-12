@@ -11,8 +11,10 @@ from dotenv import load_dotenv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env
-load_dotenv(BASE_DIR / '.env', override=True)
+# Load environment variables from .env.
+# override=False so that real environment variables (containers, systemd,
+# CI) take precedence over a checked-out .env file.
+load_dotenv(BASE_DIR / '.env', override=False)
 
 # Add apps folder to sys.path
 sys.path.insert(0, str(BASE_DIR / 'apps'))
@@ -145,6 +147,16 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    # Throttling is applied explicitly on the credential views in
+    # apps/accounts/views.py rather than globally, so that ordinary data
+    # endpoints are not rate limited. Only the rates live here.
+    'DEFAULT_THROTTLE_RATES': {
+        # Credential endpoints: blunt brute-force protection, per client IP.
+        # OTP endpoints keep their own per-destination cooldown and hourly cap
+        # in the serializers; this is the additional per-IP ceiling.
+        'auth': os.getenv('THROTTLE_RATE_AUTH', '10/min'),
+        'otp': os.getenv('THROTTLE_RATE_OTP', '20/hour'),
+    },
 }
 
 # SimpleJWT configuration

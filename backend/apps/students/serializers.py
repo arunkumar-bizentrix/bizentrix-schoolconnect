@@ -1,4 +1,6 @@
 from rest_framework import serializers
+
+from apps.schools.services import get_school_id_for
 from .models import (
     Class,
     Student,
@@ -13,6 +15,7 @@ class ClassSerializer(serializers.ModelSerializer):
     school_code = serializers.CharField(source='school.code', read_only=True)
     display_name = serializers.SerializerMethodField()
     teacher_names = serializers.SerializerMethodField()
+    student_count = serializers.SerializerMethodField()
     is_active = serializers.BooleanField(default=True, required=False)
 
     class Meta:
@@ -28,6 +31,7 @@ class ClassSerializer(serializers.ModelSerializer):
             'teachers',
             'teacher_names',
             'display_name',
+            'student_count',
             'is_active',
             'created_at',
             'updated_at',
@@ -36,6 +40,17 @@ class ClassSerializer(serializers.ModelSerializer):
 
     def get_display_name(self, obj):
         return str(obj)
+
+    def get_student_count(self, obj):
+        """
+        Number of active students in the class. Uses the queryset annotation
+        when present (list/detail reads) and falls back to a direct count for
+        freshly created instances, which are not annotated.
+        """
+        annotated = getattr(obj, 'student_count', None)
+        if annotated is not None:
+            return annotated
+        return obj.students.filter(is_active=True).count()
 
     def get_teacher_names(self, obj):
         return [
@@ -55,8 +70,9 @@ class ClassSerializer(serializers.ModelSerializer):
         if request and hasattr(request, 'user'):
             user = request.user
             if not user.is_superuser:
+                school_id = get_school_id_for(user)
                 for teacher in value:
-                    if teacher.school_id != user.school_id:
+                    if teacher.school_id != school_id:
                         raise serializers.ValidationError(
                             "Cannot assign a teacher from another school."
                         )
@@ -108,11 +124,12 @@ class StudentClassEnrollmentSerializer(serializers.ModelSerializer):
 
         if request and hasattr(request, 'user') and not request.user.is_superuser:
             user = request.user
-            if student and student.school_id != user.school_id:
+            school_id = get_school_id_for(user)
+            if student and student.school_id != school_id:
                 raise serializers.ValidationError({
                     'student': "Student must belong to your school."
                 })
-            if classroom and classroom.school_id != user.school_id:
+            if classroom and classroom.school_id != school_id:
                 raise serializers.ValidationError({
                     'classroom': "Classroom must belong to your school."
                 })
@@ -163,7 +180,7 @@ class StudentSerializer(serializers.ModelSerializer):
             request = self.context.get('request')
             if request and hasattr(request, 'user'):
                 user = request.user
-                if not user.is_superuser and user.school_id != value.school_id:
+                if not user.is_superuser and get_school_id_for(user) != value.school_id:
                     raise serializers.ValidationError(
                         "Cannot assign a student to a class from a different school."
                     )
@@ -175,8 +192,9 @@ class StudentSerializer(serializers.ModelSerializer):
             if request and hasattr(request, 'user'):
                 user = request.user
                 if not user.is_superuser:
+                    school_id = get_school_id_for(user)
                     for parent in value:
-                        if parent.school_id != user.school_id:
+                        if parent.school_id != school_id:
                             raise serializers.ValidationError(
                                 "Cannot associate a parent from another school."
                             )

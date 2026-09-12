@@ -1,6 +1,9 @@
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import viewsets, permissions, filters
+from rest_framework.exceptions import PermissionDenied
+from apps.notifications.services import NotificationService
+from apps.schools.services import attach_user_to_school, get_school_for
 from apps.students.models import Class, Student, normalize_academic_year
 from .models import Homework
 from .serializers import HomeworkSerializer
@@ -22,8 +25,7 @@ class HomeworkViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        from apps.schools.models import School
-        school = user.school or School.objects.first()
+        school = get_school_for(user)
 
         if user.is_superuser and not user.school:
             queryset = Homework.objects.select_related('school', 'classroom', 'assigned_by', 'student').all()
@@ -158,13 +160,7 @@ class HomeworkViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
-        from apps.schools.models import School
-        from rest_framework.exceptions import PermissionDenied
-
-        school = user.school or School.objects.first()
-        if not user.school and school and not user.is_superuser:
-            user.school = school
-            user.save(update_fields=['school'])
+        school = attach_user_to_school(user)
 
         classroom = serializer.validated_data.get('classroom')
         if user.role == 'TEACHER':
@@ -183,8 +179,4 @@ class HomeworkViewSet(viewsets.ModelViewSet):
             instance = serializer.save(school=school, **extra)
 
         # Dispatch real-time in-app notifications to parents of this class
-        try:
-            from apps.notifications.services import NotificationService
-            NotificationService.create_homework_notifications(instance)
-        except Exception:
-            pass
+        NotificationService.create_homework_notifications(instance)

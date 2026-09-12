@@ -47,6 +47,14 @@ class ClassAndStudentAPITests(APITestCase):
             school=self.school_b,
         )
 
+        # Parent in School A, used by the parent-link permission tests
+        self.parent = User.objects.create_user(
+            username="parent_a",
+            password="Password@123",
+            role=User.Role.PARENT,
+            school=self.school_a,
+        )
+
         # Classes in School A
         self.class_a1 = Class.objects.create(
             school=self.school_a,
@@ -115,33 +123,36 @@ class ClassAndStudentAPITests(APITestCase):
         self.assertEqual(res_stu.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res_stu.data['school'], self.school_a.id)
 
-    def test_teacher_can_create_class(self):
+    def test_teacher_cannot_create_class(self):
+        """Class creation is administrative; teachers are read-only here."""
         self.client.force_authenticate(user=self.teacher_a)
         response = self.client.post('/api/v1/classes/', {
             'name': 'Grade 7',
             'section': 'A',
             'academic_year': '2026-2027',
         })
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertIn(self.teacher_a.id, response.data['teachers'])
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(Class.objects.filter(name='Grade 7', section='A').exists())
 
-    def test_teacher_can_manage_assigned_class(self):
+    def test_teacher_cannot_modify_or_delete_classes(self):
+        """Not even the classes assigned to them - teachers only read classes."""
         self.client.force_authenticate(user=self.teacher_a)
-        # Update assigned class
-        patch_res = self.client.patch(f'/api/v1/classes/{self.class_a1.id}/', {
+
+        patch_assigned = self.client.patch(f'/api/v1/classes/{self.class_a1.id}/', {
             'name': 'Grade 5 Renamed',
         })
-        self.assertEqual(patch_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(patch_assigned.status_code, status.HTTP_403_FORBIDDEN)
 
-        # Cannot modify unassigned class
         patch_unassigned = self.client.patch(f'/api/v1/classes/{self.class_a2.id}/', {
             'name': 'Grade 8 Renamed',
         })
         self.assertIn(patch_unassigned.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND])
 
-        # Delete assigned class
         delete_res = self.client.delete(f'/api/v1/classes/{self.class_a1.id}/')
-        self.assertEqual(delete_res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(delete_res.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.class_a1.refresh_from_db()
+        self.assertEqual(self.class_a1.name, 'Grade 5')
 
     def test_teacher_sees_only_assigned_classes(self):
         self.client.force_authenticate(user=self.teacher_a)
@@ -152,7 +163,8 @@ class ClassAndStudentAPITests(APITestCase):
         self.assertEqual(results[0]['id'], self.class_a1.id)
         self.assertEqual(results[0]['name'], 'Grade 5')
 
-    def test_teacher_can_create_student_in_assigned_class(self):
+    def test_teacher_cannot_create_students(self):
+        """Student admission is administrative, including for assigned classes."""
         self.client.force_authenticate(user=self.teacher_a)
         response = self.client.post('/api/v1/students/', {
             'admission_number': 'STU-004',
@@ -160,30 +172,52 @@ class ClassAndStudentAPITests(APITestCase):
             'last_name': 'Mehta',
             'class_enrolled': self.class_a1.id,
         })
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(Student.objects.filter(admission_number='STU-004').exists())
 
-        # Cannot add student to unassigned class
-        response_unassigned = self.client.post('/api/v1/students/', {
-            'admission_number': 'STU-005',
-            'first_name': 'Sneha',
-            'last_name': 'Reddy',
-            'class_enrolled': self.class_a2.id,
-        })
-        self.assertEqual(response_unassigned.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_teacher_can_manage_student_in_assigned_class(self):
+    def test_teacher_cannot_modify_or_delete_students(self):
+        """Teachers read students in their classes; they never edit them."""
         self.client.force_authenticate(user=self.teacher_a)
-        # Update student in assigned class
-        patch_res = self.client.patch(f'/api/v1/students/{self.student_a1.id}/', {
+
+        patch_assigned = self.client.patch(f'/api/v1/students/{self.student_a1.id}/', {
             'last_name': 'Updated',
         })
-        self.assertEqual(patch_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(patch_assigned.status_code, status.HTTP_403_FORBIDDEN)
 
-        # Cannot update student in unassigned class
         patch_unassigned = self.client.patch(f'/api/v1/students/{self.student_a2.id}/', {
             'last_name': 'Hacked',
         })
         self.assertIn(patch_unassigned.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND])
+
+        delete_res = self.client.delete(f'/api/v1/students/{self.student_a1.id}/')
+        self.assertEqual(delete_res.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.student_a1.refresh_from_db()
+        self.assertEqual(self.student_a1.last_name, 'Sharma')
+
+    def test_teacher_cannot_assign_teachers_to_a_class(self):
+        """Teacher assignment - including self-assignment - is admin only."""
+        self.client.force_authenticate(user=self.teacher_a)
+        response = self.client.patch(f'/api/v1/classes/{self.class_a2.id}/', {
+            'teachers': [self.teacher_a.id],
+        })
+        self.assertIn(response.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND])
+        self.assertFalse(self.class_a2.teachers.filter(id=self.teacher_a.id).exists())
+
+    def test_teacher_cannot_manage_parent_links(self):
+        """Linking and unlinking parents is admin only."""
+        self.client.force_authenticate(user=self.teacher_a)
+        link = self.client.post(
+            f'/api/v1/students/{self.student_a1.id}/link-parent/',
+            {'parent_id': self.parent.id},
+        )
+        self.assertEqual(link.status_code, status.HTTP_403_FORBIDDEN)
+
+        unlink = self.client.post(
+            f'/api/v1/students/{self.student_a1.id}/unlink-parent/',
+            {'parent_id': self.parent.id},
+        )
+        self.assertEqual(unlink.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_teacher_cannot_enroll_student_in_unassigned_class(self):
         self.client.force_authenticate(user=self.teacher_a)
