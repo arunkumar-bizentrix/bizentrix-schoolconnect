@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
-import '../../classes/models/class_model.dart';
+import '../../../core/network/fetch_all_pages.dart';
 import '../models/exam_models.dart';
 
 List<Map<String, dynamic>> _rows(dynamic data) {
@@ -14,17 +14,12 @@ List<Map<String, dynamic>> _rows(dynamic data) {
 /// teacher, published ones for a parent.
 final examsProvider = FutureProvider.autoDispose<List<ExamModel>>((ref) async {
   final apiClient = ref.watch(apiClientProvider);
-  final response = await apiClient.dio.get(ApiEndpoints.exams);
-  final exams = _rows(response.data).map(ExamModel.fromJson).toList();
-
-  // Follow further pages; a school holds a handful of exams a year, not pages.
-  var next = response.data is Map ? (response.data as Map)['next'] as String? : null;
-  while (next != null) {
-    final page = await apiClient.dio.getUri(Uri.parse(next));
-    exams.addAll(_rows(page.data).map(ExamModel.fromJson));
-    next = (page.data as Map)['next'] as String?;
-  }
-  return exams;
+  return fetchAllPages(
+    apiClient.dio,
+    ApiEndpoints.exams,
+    fromJson: ExamModel.fromJson,
+    idOf: (exam) => exam.id,
+  );
 });
 
 final examDetailProvider = FutureProvider.autoDispose.family<ExamModel, int>((ref, examId) async {
@@ -65,24 +60,12 @@ final reportCardProvider = FutureProvider.autoDispose.family<ReportCard, int>((r
   return ReportCard.fromJson(Map<String, dynamic>.from(response.data as Map));
 });
 
-/// Every class for an academic year, across pages - an exam is set for all
-/// of them at once, so the first 20 are not enough.
-final allClassesProvider =
-    FutureProvider.autoDispose.family<List<ClassModel>, String>((ref, academicYear) async {
+/// The school's grading scale. Grades themselves are always computed by the
+/// backend; this is only for showing and editing the scale.
+final gradeScaleProvider = FutureProvider.autoDispose<GradeScale>((ref) async {
   final apiClient = ref.watch(apiClientProvider);
-  final response = await apiClient.dio.get(
-    ApiEndpoints.classes,
-    queryParameters: {'academic_year': academicYear},
-  );
-  final classes = _rows(response.data).map(ClassModel.fromJson).toList();
-  var next = response.data is Map ? (response.data as Map)['next'] as String? : null;
-  while (next != null) {
-    final page = await apiClient.dio.getUri(Uri.parse(next));
-    classes.addAll(_rows(page.data).map(ClassModel.fromJson));
-    next = (page.data as Map)['next'] as String?;
-  }
-  classes.sort((a, b) => a.displayName.compareTo(b.displayName));
-  return classes;
+  final response = await apiClient.dio.get(ApiEndpoints.gradeScale);
+  return GradeScale.fromJson(Map<String, dynamic>.from(response.data as Map));
 });
 
 /// Writes against exams. Every method returns null on success or the
@@ -177,6 +160,15 @@ class ExamActions {
   Future<String?> unpublish(int examId) => _run(() async {
         await _api.dio.post(ApiEndpoints.examUnpublish(examId));
         _refreshExam(examId);
+      });
+
+  Future<String?> saveGradeScale(List<GradeBand> bands) => _run(() async {
+        await _api.dio.put(ApiEndpoints.gradeScale, data: {
+          'bands': [for (final band in bands) band.toJson()],
+        });
+        ref.invalidate(gradeScaleProvider);
+        ref.invalidate(reportCardProvider);
+        ref.invalidate(classResultsProvider);
       });
 
   void _refreshExam(int examId) {

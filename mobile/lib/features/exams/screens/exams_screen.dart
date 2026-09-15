@@ -10,6 +10,7 @@ import '../models/exam_models.dart';
 import '../providers/exams_provider.dart';
 import 'create_exam_screen.dart';
 import 'exam_detail_screen.dart';
+import 'grade_scale_screen.dart';
 
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -44,6 +45,16 @@ class ExamsScreen extends ConsumerWidget {
           isAdmin ? 'Exams & Results' : 'Exams & Marks',
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: AppColors.textPrimary),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Grading scale',
+            icon: const Icon(Icons.grading_rounded),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const GradeScaleScreen()),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: isAdmin
           ? FloatingActionButton.extended(

@@ -20,6 +20,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         # Strict user scoping
         user = self.request.user
         queryset = Notification.objects.filter(recipient=user).select_related(
+            'student',
             'homework', 'announcement'
         )
 

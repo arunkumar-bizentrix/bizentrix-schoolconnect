@@ -6,6 +6,7 @@ class ApiEndpoints {
   static const String refreshToken = '/auth/token/refresh/';
   static const String authRegister = '/auth/register/';
   static const String userProfile = '/auth/me/';
+  static const String changePassword = '/auth/change-password/';
   static const String schoolStaff = '/auth/staff/';
   static String staffDetail(dynamic id) => '/auth/staff/$id/';
   static String staffResetPassword(dynamic id) => '/auth/staff/$id/reset-password/';
@@ -36,6 +37,19 @@ class ApiEndpoints {
   static const String parentChildren = '/parent/children/';
   static const String parentToday = '/parent/today/';
 
+  // Monitoring
+  static const String dashboardSummary = '/dashboard/summary/';
+  static String studentProfile(dynamic id) => '/students/$id/profile/';
+  static String classOverview(dynamic id) => '/classes/$id/overview/';
+  static String teacherProfile(dynamic id) => '/auth/staff/$id/profile/';
+
+  // Messages
+  static const String conversations = '/messages/conversations/';
+  static String conversation(dynamic id) => '/messages/conversations/$id/';
+  static String conversationMessages(dynamic id) => '/messages/conversations/$id/messages/';
+  static const String messageContacts = '/messages/contacts/';
+  static const String messagesUnreadCount = '/messages/unread-count/';
+
   // Subjects & Timetable
   static const String subjects = '/subjects/';
   static const String timetable = '/timetable/';
@@ -60,6 +74,9 @@ class ApiEndpoints {
   static String examPaperDetail(dynamic id) => '/exam-papers/$id/';
   static String examPaperMarks(dynamic id) => '/exam-papers/$id/marks/';
   static const String reportCard = '/report-card/';
+  static String reportCardPdf(int studentId, {int? examId}) =>
+      '/report-card/pdf/?student_id=$studentId${examId == null ? '' : '&exam_id=$examId'}';
+  static const String gradeScale = '/grade-scale/';
 
   // Notifications
   static const String notifications = '/notifications/';

@@ -70,7 +70,8 @@ class ExamPaper(models.Model):
         related_name='exam_papers',
     )
     max_marks = models.PositiveSmallIntegerField(default=100)
-    pass_marks = models.PositiveSmallIntegerField(default=35)
+    # 33% of the default 100: grade D is a pass (see grading.py).
+    pass_marks = models.PositiveSmallIntegerField(default=33)
     exam_date = models.DateField(null=True, blank=True)
 
     class Meta:
@@ -133,3 +134,35 @@ class Mark(models.Model):
     def __str__(self):
         shown = 'Absent' if self.is_absent else self.marks_obtained
         return f'{self.student} · {self.paper.subject}: {shown}'
+
+
+class GradeBand(models.Model):
+    """
+    One step of the school's grading scale, e.g. A1 from 91%.
+
+    Only the lower bound is stored; each band runs up to the next one. That
+    makes gaps and overlaps impossible by construction.
+    """
+
+    school = models.ForeignKey(
+        'schools.School',
+        on_delete=models.CASCADE,
+        related_name='grade_bands',
+    )
+    label = models.CharField(max_length=8, help_text="e.g. A1")
+    min_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        help_text="Lowest percentage that earns this grade.",
+    )
+    description = models.CharField(max_length=60, blank=True, help_text="e.g. Outstanding")
+
+    class Meta:
+        ordering = ['-min_percentage']
+        constraints = [
+            models.UniqueConstraint(fields=['school', 'label'], name='unique_grade_label_per_school'),
+            models.UniqueConstraint(fields=['school', 'min_percentage'], name='unique_grade_minimum_per_school'),
+        ]
+
+    def __str__(self):
+        return f'{self.label} (from {self.min_percentage:g}%)'

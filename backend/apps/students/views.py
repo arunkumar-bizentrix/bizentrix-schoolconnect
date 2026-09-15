@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from apps.accounts.models import User
+from apps.accounts.services.accounts import normalize_phone
 from apps.schools.services import attach_user_to_school, get_school_for
 
 from .models import Class, Student, StudentClassEnrollment, normalize_academic_year
@@ -31,6 +32,15 @@ class ClassViewSet(viewsets.ModelViewSet):
     search_fields = ['name', 'section', 'academic_year']
     ordering_fields = ['name', 'section', 'academic_year', 'created_at']
 
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        # A client-chosen ?ordering= replaces the default; keep `id` last so
+        # paging stays stable whatever the sort.
+        ordering = list(queryset.query.order_by)
+        if 'id' not in ordering and '-id' not in ordering:
+            queryset = queryset.order_by(*ordering, 'id')
+        return queryset
+
     def get_queryset(self):
         user = self.request.user
         school = get_school_for(user)
@@ -44,6 +54,12 @@ class ClassViewSet(viewsets.ModelViewSet):
         # Teachers only see classes assigned to them
         if user.role == 'TEACHER':
             queryset = queryset.filter(teachers=user)
+        # Parents only see their own children's classes. A subquery rather
+        # than a join, so the student_count annotation is not multiplied.
+        elif user.role == 'PARENT':
+            queryset = queryset.filter(
+                id__in=Class.objects.filter(students__parents=user).values('id')
+            )
 
         params = self.request.query_params
 
@@ -74,7 +90,10 @@ class ClassViewSet(viewsets.ModelViewSet):
         if assigned_to_me and assigned_to_me.lower() in ['true', '1', 'yes']:
             queryset = queryset.filter(teachers=user)
 
-        return queryset
+        # Name and section repeat across academic years, so they alone do not
+        # give a total order - and without one, a row can land on two pages
+        # or on neither when a client walks every page. `id` breaks the tie.
+        return queryset.order_by('name', 'section', 'academic_year', 'id')
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -276,13 +295,24 @@ class StudentViewSet(viewsets.ModelViewSet):
         email = request.data.get('email')
         phone = request.data.get('phone_number') or request.data.get('phone')
 
+        # Only this school's parents, and only an exact match: "98111" used to
+        # link whichever parent's number happened to contain it.
+        parents = User.objects.filter(role=User.Role.PARENT, school_id=student.school_id)
         parent = None
         if parent_id:
-            parent = User.objects.filter(id=parent_id, role=User.Role.PARENT).first()
+            parent = parents.filter(id=parent_id).first()
         elif email:
-            parent = User.objects.filter(email__iexact=str(email).strip(), role=User.Role.PARENT).first()
+            parent = parents.filter(email__iexact=str(email).strip()).first()
         elif phone:
-            parent = User.objects.filter(phone_number__icontains=str(phone).strip(), role=User.Role.PARENT).first()
+            digits = normalize_phone(phone)
+            if len(digits) == 10:
+                matches = list(parents.filter(phone_number=digits)[:2])
+                if len(matches) > 1:
+                    return Response(
+                        {"detail": "More than one parent uses that number. Link by choosing the parent instead."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                parent = matches[0] if matches else None
 
         if not parent:
             return Response(

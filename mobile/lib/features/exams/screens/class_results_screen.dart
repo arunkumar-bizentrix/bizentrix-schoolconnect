@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../shared/widgets/list_state_views.dart';
 import '../models/exam_models.dart';
 import '../providers/exams_provider.dart';
+import '../widgets/grade_badge.dart';
 import 'exams_screen.dart';
 import 'report_card_screen.dart';
 
@@ -209,9 +210,18 @@ class _ResultTile extends StatelessWidget {
                           fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
-                      Text(
-                        '${formatMarks(row.percentage)}%',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${formatMarks(row.percentage)}%',
+                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                          if (row.grade != null) ...[
+                            const SizedBox(width: 6),
+                            GradeBadge(grade: row.grade),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -230,7 +240,7 @@ class _ResultTile extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        '${subject.subject} ${subject.display}',
+                        [subject.subject, subject.display, if (subject.grade != null) subject.grade!].join(' '),
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w600,

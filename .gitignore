@@ -74,3 +74,14 @@ coverage/
 htmlcov/
 scratch/
 scratch_*.py
+
+# Credentials - never commit, wherever in the repo they are dropped
+.env
+.env.*
+!.env.example
+*service-account*.json
+*firebase-adminsdk*.json
+google-services.json
+GoogleService-Info.plist
+*.pem
+*.p12

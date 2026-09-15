@@ -16,7 +16,6 @@ class AppConstants {
   static const String schoolEmail = 'vivekanandaschoolbagalur@gmail.com';
   static const String schoolWebsite = 'https://swamyviv.com/';
   static const String schoolLogoPath = 'assets/images/school_logo.png';
-  static const String schoolCampusPath = 'assets/images/school_campus.jpg';
 
   // Base API configuration (Wi-Fi LAN IP or adb reverse fallback)
   static const String defaultBaseUrl = String.fromEnvironment(

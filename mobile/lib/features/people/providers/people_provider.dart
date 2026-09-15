@@ -6,12 +6,35 @@ import '../../../core/network/page_result.dart';
 import '../../auth/models/staff_model.dart';
 import '../../auth/providers/staff_provider.dart';
 
-/// What the admin needs to hand a new person their login.
+/// How a temporary password reached (or must reach) the person.
 class IssuedLogin {
-  const IssuedLogin({required this.account, required this.temporaryPassword});
+  const IssuedLogin({
+    required this.account,
+    required this.sentBySms,
+    this.temporaryPassword,
+    this.smsDetail,
+    this.expiresAt,
+  });
 
   final StaffModel account;
-  final String temporaryPassword;
+
+  /// True when the backend texted the password; it is then never returned.
+  final bool sentBySms;
+
+  /// Present only when SMS did not send it - shown to the admin once.
+  final String? temporaryPassword;
+
+  /// Why SMS did not send it ("SMS is not set up...").
+  final String? smsDetail;
+  final DateTime? expiresAt;
+
+  factory IssuedLogin.fromJson(StaffModel account, Map<String, dynamic> data) => IssuedLogin(
+        account: account,
+        sentBySms: data['delivery'] == 'sms',
+        temporaryPassword: data['temporary_password']?.toString(),
+        smsDetail: data['sms_detail']?.toString(),
+        expiresAt: DateTime.tryParse('${data['expires_at'] ?? ''}')?.toLocal(),
+      );
 }
 
 /// Result of an admin action: either a value or a message to show.
@@ -107,9 +130,9 @@ class PeopleNotifier extends StateNotifier<AsyncValue<List<StaffModel>>> {
         },
       );
       final data = Map<String, dynamic>.from(response.data as Map);
-      final issued = IssuedLogin(
-        account: StaffModel.fromJson(Map<String, dynamic>.from(data['account'] as Map)),
-        temporaryPassword: data['temporary_password'].toString(),
+      final issued = IssuedLogin.fromJson(
+        StaffModel.fromJson(Map<String, dynamic>.from(data['account'] as Map)),
+        data,
       );
       _refreshPickers();
       await load();
@@ -150,11 +173,11 @@ class PeopleNotifier extends StateNotifier<AsyncValue<List<StaffModel>>> {
     }
   }
 
-  Future<PeopleActionResult<String>> resetPassword(int id) async {
+  Future<PeopleActionResult<IssuedLogin>> resetPassword(StaffModel person) async {
     try {
-      final response = await apiClient.dio.post(ApiEndpoints.staffResetPassword(id));
+      final response = await apiClient.dio.post(ApiEndpoints.staffResetPassword(person.id));
       return PeopleActionResult.ok(
-        (response.data as Map)['temporary_password'].toString(),
+        IssuedLogin.fromJson(person, Map<String, dynamic>.from(response.data as Map)),
       );
     } catch (e) {
       return PeopleActionResult.failed(apiClient.handleError(e).message);

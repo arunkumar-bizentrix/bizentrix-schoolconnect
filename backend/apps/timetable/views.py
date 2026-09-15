@@ -1,3 +1,4 @@
+from django.db.models import Q
 from collections import defaultdict
 
 from django.utils import timezone
@@ -11,6 +12,26 @@ from apps.students.models import Class
 
 from .models import Subject, TimetableSlot
 from .serializers import SubjectSerializer, TimetableSlotSerializer
+
+
+def group_week(slots):
+    """Groups slots into the six-day week the UI draws (Sunday only if used)."""
+    buckets = defaultdict(list)
+    for slot in slots:
+        buckets[slot.weekday].append(slot)
+
+    return [
+        {
+            'weekday': weekday,
+            'weekday_name': label,
+            'periods': TimetableSlotSerializer(
+                sorted(buckets.get(weekday, []), key=lambda s: s.period),
+                many=True,
+            ).data,
+        }
+        for weekday, label in TimetableSlot.Weekday.choices
+        if weekday != TimetableSlot.Weekday.SUNDAY or buckets.get(weekday)
+    ]
 
 
 class IsAdminOrReadOnly(permissions.BasePermission):
@@ -104,6 +125,10 @@ class TimetableViewSet(viewsets.ModelViewSet):
                 is_active=True, class_enrolled__isnull=False
             ).values_list('class_enrolled_id', flat=True)
             queryset = queryset.filter(classroom_id__in=list(child_classes))
+        # Teachers see the classes they are assigned to, plus any period they
+        # teach elsewhere - not every class in the school.
+        elif user.role == 'TEACHER':
+            queryset = queryset.filter(Q(classroom__teachers=user) | Q(teacher=user)).distinct()
 
         params = self.request.query_params
 
@@ -138,23 +163,8 @@ class TimetableViewSet(viewsets.ModelViewSet):
     # ------------------------------------------------------------------
 
     def _grouped_by_weekday(self, slots):
-        """Groups slots into the six-day week the UI draws."""
-        buckets = defaultdict(list)
-        for slot in slots:
-            buckets[slot.weekday].append(slot)
+        return group_week(slots)
 
-        return [
-            {
-                'weekday': weekday,
-                'weekday_name': label,
-                'periods': TimetableSlotSerializer(
-                    sorted(buckets.get(weekday, []), key=lambda s: s.period),
-                    many=True,
-                ).data,
-            }
-            for weekday, label in TimetableSlot.Weekday.choices
-            if weekday != TimetableSlot.Weekday.SUNDAY or buckets.get(weekday)
-        ]
 
     @action(detail=False, methods=['get'], url_path='week')
     def week(self, request):
@@ -180,6 +190,12 @@ class TimetableViewSet(viewsets.ModelViewSet):
         slots = self.get_queryset().filter(classroom=classroom)
         if request.user.role == 'PARENT' and not slots.exists():
             raise PermissionDenied("That class is not one of your children's.")
+        if (
+            request.user.role == 'TEACHER'
+            and not classroom.teachers.filter(id=request.user.id).exists()
+            and not slots.exists()
+        ):
+            raise PermissionDenied("You can only see the timetable of classes you teach.")
 
         return Response({
             'classroom': classroom.id,

@@ -29,7 +29,7 @@ class ExamPaperSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         max_marks = attrs.get('max_marks', getattr(self.instance, 'max_marks', 100))
-        pass_marks = attrs.get('pass_marks', getattr(self.instance, 'pass_marks', 35))
+        pass_marks = attrs.get('pass_marks', getattr(self.instance, 'pass_marks', 33))
         if max_marks == 0:
             raise serializers.ValidationError({'max_marks': 'Maximum marks must be more than zero.'})
         if pass_marks > max_marks:
@@ -60,7 +60,7 @@ class ExamSerializer(serializers.ModelSerializer):
         child=serializers.IntegerField(), write_only=True, required=False
     )
     max_marks = serializers.IntegerField(write_only=True, required=False, min_value=1, default=100)
-    pass_marks = serializers.IntegerField(write_only=True, required=False, min_value=0, default=35)
+    pass_marks = serializers.IntegerField(write_only=True, required=False, min_value=0, default=33)
 
     classrooms = serializers.SerializerMethodField()
     subjects = serializers.SerializerMethodField()
@@ -114,7 +114,7 @@ class ExamSerializer(serializers.ModelSerializer):
         if start and end and end < start:
             raise serializers.ValidationError({'end_date': 'End date cannot be before the start date.'})
 
-        if attrs.get('pass_marks', 35) > attrs.get('max_marks', 100):
+        if attrs.get('pass_marks', 33) > attrs.get('max_marks', 100):
             raise serializers.ValidationError({'pass_marks': 'Pass marks cannot exceed maximum marks.'})
 
         school = self.context['school']
@@ -140,7 +140,7 @@ class ExamSerializer(serializers.ModelSerializer):
         classrooms = validated_data.pop('_classrooms')
         subjects = validated_data.pop('_subjects')
         max_marks = validated_data.pop('max_marks', 100)
-        pass_marks = validated_data.pop('pass_marks', 35)
+        pass_marks = validated_data.pop('pass_marks', 33)
         validated_data.pop('classroom_ids', None)
         validated_data.pop('subject_ids', None)
 
@@ -172,3 +172,9 @@ class MarkEntrySerializer(serializers.Serializer):
 
 class MarkSheetSubmitSerializer(serializers.Serializer):
     entries = MarkEntrySerializer(many=True)
+
+
+class GradeBandSerializer(serializers.Serializer):
+    label = serializers.CharField(max_length=8)
+    min_percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
+    description = serializers.CharField(max_length=60, required=False, allow_blank=True, default='')

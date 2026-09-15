@@ -1,7 +1,11 @@
 import logging
 from collections import defaultdict
 
+import threading
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import connection as db_connection, transaction
 from apps.students.models import Student
 from . import push
 from .models import DeviceToken, Notification
@@ -21,53 +25,86 @@ class NotificationService:
     @classmethod
     def _push(cls, notifications):
         """
-        Delivers the given notifications to whatever devices their recipients
-        have registered. Grouped per recipient so one parent with two phones
-        gets one message on each, not two on one.
+        Pushes the given notifications to their recipients' registered phones.
+
+        One push per distinct message per recipient: a parent with two
+        children gets both "Kavya is absent" and "Diya is present", while a
+        class-wide event that produced a single row sends a single alert.
+
+        Device lookup happens here; the network calls run after the database
+        commit, in a background thread unless PUSH_IN_BACKGROUND is off.
         """
         try:
-            if not notifications:
+            jobs = cls._push_jobs(notifications)
+            if not jobs:
                 return
-
-            by_recipient = defaultdict(list)
-            for notification in notifications:
-                by_recipient[notification.recipient_id].append(notification)
-
-            tokens_by_user = defaultdict(list)
-            for row in DeviceToken.objects.filter(
-                user_id__in=by_recipient.keys(), is_active=True
-            ).values_list('user_id', 'token'):
-                tokens_by_user[row[0]].append(row[1])
-
-            dead_tokens = []
-            for user_id, items in by_recipient.items():
-                tokens = tokens_by_user.get(user_id)
-                if not tokens:
-                    continue
-
-                # One phone alert per event, even if several rows were created.
-                notification = items[0]
-                result = push.send_to_tokens(
-                    tokens,
-                    title=notification.title,
-                    body=notification.message,
-                    data={
-                        'notification_id': notification.id,
-                        'type': notification.notification_type,
-                        'homework_id': notification.homework_id or '',
-                        'announcement_id': notification.announcement_id or '',
-                        'attendance_id': notification.attendance_id or '',
-                        'exam_id': notification.exam_id or '',
-                    },
-                )
-                dead_tokens.extend(result['invalid_tokens'])
-
-            # Retire tokens Firebase says no longer exist, so a wiped phone
-            # does not keep costing a failed send on every notification.
-            if dead_tokens:
-                DeviceToken.objects.filter(token__in=dead_tokens).update(is_active=False)
+            if getattr(settings, 'PUSH_IN_BACKGROUND', True):
+                transaction.on_commit(lambda: threading.Thread(
+                    target=cls._deliver_in_background, args=(jobs,), daemon=True, name='push-fanout',
+                ).start())
+            else:
+                cls._deliver(jobs)
         except Exception as exc:
             logger.error("Push fan-out failed: %s", exc.__class__.__name__)
+
+    @classmethod
+    def _push_jobs(cls, notifications):
+        notifications = [n for n in (notifications or []) if n is not None]
+        if not notifications:
+            return []
+
+        tokens_by_user = defaultdict(list)
+        for user_id, token in DeviceToken.objects.filter(
+            user_id__in={n.recipient_id for n in notifications}, is_active=True
+        ).values_list('user_id', 'token'):
+            tokens_by_user[user_id].append(token)
+
+        jobs, seen = [], set()
+        for notification in notifications:
+            tokens = tokens_by_user.get(notification.recipient_id)
+            key = (notification.recipient_id, notification.title, notification.message)
+            if not tokens or key in seen:
+                continue
+            seen.add(key)
+            jobs.append({
+                'tokens': list(tokens),
+                'title': notification.title,
+                'body': notification.message,
+                'data': {
+                    'notification_id': notification.id,
+                    'type': notification.notification_type,
+                    'homework_id': notification.homework_id or '',
+                    'announcement_id': notification.announcement_id or '',
+                    'attendance_id': notification.attendance_id or '',
+                    'exam_id': notification.exam_id or '',
+                    'conversation_id': notification.conversation_id or '',
+                    'student_id': notification.student_id or '',
+                },
+            })
+        return jobs
+
+    @classmethod
+    def _deliver(cls, jobs):
+        dead_tokens = []
+        for job in jobs:
+            result = push.send_to_tokens(job['tokens'], title=job['title'], body=job['body'], data=job['data'])
+            dead_tokens.extend(result.get('invalid_tokens', []))
+            if result.get('auth_failed'):
+                # The credential is refused; the remaining jobs would fail too.
+                break
+        # Retire tokens Firebase says no longer exist, so a wiped phone does
+        # not keep costing a failed send on every notification.
+        if dead_tokens:
+            DeviceToken.objects.filter(token__in=dead_tokens).update(is_active=False)
+
+    @classmethod
+    def _deliver_in_background(cls, jobs):
+        try:
+            cls._deliver(jobs)
+        except Exception as exc:
+            logger.error("Background push failed: %s", exc.__class__.__name__)
+        finally:
+            db_connection.close()
 
     @classmethod
     def create_homework_notifications(cls, homework):
@@ -112,6 +149,7 @@ class NotificationService:
                     title=f"New Homework: {homework.subject}",
                     message=f"New {homework.subject} homework '{homework.title}' has been assigned for {class_label}. Due date: {due_str}.",
                     homework=homework,
+                    student=homework.student,
                     is_read=False,
                 )
                 for parent in parent_users
@@ -177,6 +215,7 @@ class NotificationService:
                             title=title_template.format(**context),
                             message=body,
                             attendance=record,
+                            student=record.student,
                             is_read=False,
                         )
                     )
@@ -195,9 +234,11 @@ class NotificationService:
     @classmethod
     def create_announcement_notifications(cls, announcement):
         """
-        Dispatches in-app notifications to parents when an announcement is published.
-        - CLASS announcement: Notifies unique parents of students in target_class.
-        - SCHOOL announcement: Notifies all active parent accounts in the school.
+        Dispatches notifications when an announcement is published.
+        - CLASS announcement: the unique parents of students in target_class.
+        - SCHOOL announcement: every active parent and every active teacher of
+          the school - staff need the early-dismissal notice as much as
+          families do. The author is not notified of their own notice.
         """
         try:
             if not announcement or not announcement.is_active:
@@ -215,14 +256,13 @@ class NotificationService:
                     for parent in student.parents.filter(is_active=True):
                         parent_users.add(parent)
             elif announcement.audience_type == 'SCHOOL':
-                school = announcement.school
-                parents = User.objects.filter(
-                    school=school,
-                    role=User.Role.PARENT,
+                parent_users.update(User.objects.filter(
+                    school=announcement.school,
+                    role__in=[User.Role.PARENT, User.Role.TEACHER],
                     is_active=True,
-                )
-                for parent in parents:
-                    parent_users.add(parent)
+                ))
+
+            parent_users.discard(announcement.created_by)
 
             if not parent_users:
                 return []

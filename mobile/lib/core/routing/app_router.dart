@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../features/auth/screens/change_password_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/dashboard/screens/main_nav_scaffold.dart';
 import '../../features/homework/screens/create_homework_screen.dart';
@@ -25,15 +26,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final auth = ref.read(authProvider);
       final loggedIn = auth.isAuthenticated;
       final isOnLogin = state.matchedLocation == '/login';
+      final isOnChangePassword = state.matchedLocation == '/change-password';
+      final mustChange = auth.user?.mustChangePassword ?? false;
 
       if (!loggedIn && !isOnLogin) return '/login';
-      if (loggedIn && isOnLogin) return '/dashboard';
+      // The backend refuses everything else until this is done; the app
+      // simply goes where the user can actually proceed.
+      if (loggedIn && mustChange && !isOnChangePassword) return '/change-password';
+      if (loggedIn && !mustChange && (isOnLogin || isOnChangePassword)) return '/dashboard';
       return null;
     },
     routes: [
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/change-password',
+        builder: (context, state) => const ChangePasswordScreen(forced: true),
       ),
       GoRoute(
         path: '/dashboard',

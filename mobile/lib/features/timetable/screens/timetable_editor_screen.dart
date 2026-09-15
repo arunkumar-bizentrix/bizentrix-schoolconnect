@@ -5,7 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../auth/models/staff_model.dart';
 import '../../auth/providers/staff_provider.dart';
 import '../../classes/models/class_model.dart';
-import '../../classes/providers/classes_provider.dart';
+import '../../classes/providers/class_options_provider.dart';
 import '../models/subject_model.dart';
 import '../models/timetable_model.dart';
 import '../providers/timetable_editor_provider.dart';
@@ -46,7 +46,7 @@ class _TimetableEditorScreenState extends ConsumerState<TimetableEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final classes = ref.watch(classesProvider).value ?? const <ClassModel>[];
+    final classes = ref.watch(currentClassOptionsProvider).value ?? const <ClassModel>[];
     if (_classId == null && classes.isNotEmpty) _classId = classes.first.id;
 
     return Scaffold(
@@ -393,7 +393,7 @@ class _TimetableEditorScreenState extends ConsumerState<TimetableEditorScreen> {
                 children: [
                   Text(
                     '${_weekdayNames[_weekday]} · '
-                    '${(ref.read(classesProvider).value ?? []).firstWhere((c) => c.id == classId, orElse: () => (ref.read(classesProvider).value ?? []).first).displayName}',
+                    '${(ref.read(currentClassOptionsProvider).value ?? []).firstWhere((c) => c.id == classId, orElse: () => (ref.read(currentClassOptionsProvider).value ?? []).first).displayName}',
                     style: const TextStyle(
                         fontSize: 12, color: AppColors.textSecondary),
                   ),

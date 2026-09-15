@@ -73,3 +73,14 @@ class MarkAttendanceSerializer(serializers.Serializer):
                 "Attendance cannot be marked for a future date."
             )
         return value
+
+
+class AttendanceCorrectionSerializer(AttendanceSerializer):
+    """
+    Correcting one day's mark. Who, which class and which day are fixed - a
+    PATCH that could change the student would let a teacher write attendance
+    for a child they do not teach through a record they do.
+    """
+
+    class Meta(AttendanceSerializer.Meta):
+        read_only_fields = AttendanceSerializer.Meta.read_only_fields + ['student', 'classroom', 'date']

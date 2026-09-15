@@ -16,6 +16,7 @@ import 'package:school_connect/features/exams/screens/class_results_screen.dart'
 import 'package:school_connect/features/exams/screens/create_exam_screen.dart';
 import 'package:school_connect/features/exams/screens/exam_detail_screen.dart';
 import 'package:school_connect/features/exams/screens/exams_screen.dart';
+import 'package:school_connect/features/exams/screens/grade_scale_screen.dart';
 import 'package:school_connect/features/exams/screens/mark_entry_screen.dart';
 import 'package:school_connect/features/exams/screens/report_card_screen.dart';
 import 'package:school_connect/features/people/screens/people_screen.dart';
@@ -149,6 +150,19 @@ final Map<String, Object> _responses = {
       {'id': 3, 'name': 'Grade 10', 'section': 'A', 'academic_year': '2026-2027', 'display_name': 'Grade 10 - A (2026-2027)'},
     ],
   },
+  '/grade-scale/': {
+    'is_default': true,
+    'bands': [
+      {'label': 'A1', 'min_percentage': 91, 'description': 'Outstanding'},
+      {'label': 'A2', 'min_percentage': 81, 'description': 'Excellent'},
+      {'label': 'B1', 'min_percentage': 71, 'description': 'Very good'},
+      {'label': 'B2', 'min_percentage': 61, 'description': 'Good'},
+      {'label': 'C1', 'min_percentage': 51, 'description': 'Above average'},
+      {'label': 'C2', 'min_percentage': 41, 'description': 'Average'},
+      {'label': 'D', 'min_percentage': 33, 'description': 'Pass'},
+      {'label': 'E', 'min_percentage': 0, 'description': 'Needs improvement'},
+    ],
+  },
   '/subjects/': [
     for (final (index, subject) in _subjects.indexed) {'id': index + 1, 'name': subject, 'is_active': true},
   ],
@@ -183,6 +197,8 @@ Map<String, Object?> _resultRow({required int? rank, required String result}) =>
             'max_marks': 100,
             'pass_marks': 35,
             'marks_obtained': subject == 'Tamil' ? 12.5 : 99.5,
+            'percentage': subject == 'Tamil' ? 12.5 : 99.5,
+            'grade': subject == 'Tamil' ? 'E' : 'A1',
             'is_absent': false,
             'entered': true,
             'passed': subject != 'Tamil',
@@ -191,6 +207,7 @@ Map<String, Object?> _resultRow({required int? rank, required String result}) =>
       'total': 510.0,
       'max_total': 600,
       'percentage': 85.0,
+      'grade': result == 'INCOMPLETE' ? null : 'A2',
       'result': result,
       'rank': rank,
     };
@@ -199,9 +216,12 @@ class _RoutedAdapter implements HttpClientAdapter {
   @override
   void close({bool force = false}) {}
 
+  static final List<Uri> requests = [];
+
   @override
   Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
-    final body = _responses[options.path] ?? {'count': 0, 'next': null, 'previous': null, 'results': []};
+    requests.add(options.uri);
+    final body = _responses[options.uri.path.replaceFirst(RegExp(r'^.*/api/v1'), '')] ?? _responses[options.path] ?? {'count': 0, 'next': null, 'previous': null, 'results': []};
     return ResponseBody.fromString(
       jsonEncode(body),
       200,
@@ -262,7 +282,7 @@ final _today = ChildToday.fromJson({
   'homework_due_soon': [
     {'id': 9, 'title': 'Essay', 'subject': 'English Literature', 'due_display': '17 Sep 2026, 9:00 AM'},
   ],
-  'latest_result': {'exam': 7, 'exam_name': 'Quarterly Examination 2026 (Revised Schedule)', 'total': 510.5, 'max_total': 600, 'percentage': 85.1, 'rank': 12, 'class_size': 38, 'result': 'PASS'},
+  'latest_result': {'exam': 7, 'exam_name': 'Quarterly Examination 2026 (Revised Schedule)', 'total': 510.5, 'max_total': 600, 'percentage': 85.1, 'grade': 'A2', 'rank': 12, 'class_size': 38, 'result': 'PASS'},
 });
 
 void main() {
@@ -285,6 +305,7 @@ void main() {
     'MarkEntryScreen': const MarkEntryScreen(paperId: 100, examId: 7),
     'ClassResultsScreen': const ClassResultsScreen(examId: 7, classId: 3),
     'ReportCardScreen': const ReportCardScreen(studentId: 1),
+    'GradeScaleScreen': const GradeScaleScreen(),
     'ChildTodayCard': Scaffold(body: SingleChildScrollView(child: ChildTodayCard(today: _today, now: DateTime(2026, 9, 14, 10, 20)))),
   };
 
@@ -336,6 +357,73 @@ void main() {
     expect(find.text('12th'), findsOneWidget);
   });
 
+  testWidgets('report card shows the overall and subject grades from the API', (tester) async {
+    await pumpAt(tester, const ReportCardScreen(studentId: 1), 430, role: UserRole.parent);
+    expect(find.text('A2'), findsOneWidget);
+    expect(find.text('A1'), findsNWidgets(5));
+    expect(find.text('E'), findsOneWidget);
+  });
+
+  testWidgets('class results show each student\'s grade, none while incomplete', (tester) async {
+    await pumpAt(tester, const ClassResultsScreen(examId: 7, classId: 3), 430);
+    expect(find.text('A2'), findsOneWidget, reason: 'the incomplete row has no overall grade');
+    expect(find.textContaining('Tamil 12.5 E'), findsNWidgets(2));
+  });
+
+  testWidgets('grading scale lists the approved bands with ranges', (tester) async {
+    await pumpAt(tester, const GradeScaleScreen(), 430);
+    expect(find.text('91-100%'), findsOneWidget);
+    expect(find.text('33-40%'), findsOneWidget);
+    expect(find.text('0-32%'), findsOneWidget);
+    expect(find.text('Edit'), findsOneWidget, reason: 'admins can edit');
+  });
+
+  testWidgets('teachers can read the scale but not edit it', (tester) async {
+    await pumpAt(tester, const GradeScaleScreen(), 430, role: UserRole.teacher);
+    expect(find.text('Outstanding'), findsOneWidget);
+    expect(find.text('Edit'), findsNothing);
+  });
+
+  testWidgets('new exam pass mark follows 33 percent of the maximum', (tester) async {
+    await pumpAt(tester, const CreateExamScreen(), 430);
+    final maximum = find.widgetWithText(TextFormField, 'Maximum');
+    final pass = find.widgetWithText(TextFormField, 'Pass');
+    await tester.scrollUntilVisible(maximum, 300, scrollable: find.byType(Scrollable).first);
+    expect(tester.widget<TextFormField>(pass).controller!.text, '33');
+    await tester.enterText(maximum, '50');
+    await tester.pump();
+    expect(tester.widget<TextFormField>(pass).controller!.text, '17');
+  });
+
+  testWidgets('Today card shows the grade of the last result', (tester) async {
+    await pumpAt(tester, Scaffold(body: SingleChildScrollView(child: ChildTodayCard(today: _today, now: DateTime(2026, 9, 14, 10, 20)))), 430);
+    expect(find.textContaining('Grade A2'), findsOneWidget);
+  });
+
+  testWidgets('PDF buttons request the student marksheet with the signed-in client', (tester) async {
+    _RoutedAdapter.requests.clear();
+    await pumpAt(tester, const ReportCardScreen(studentId: 1), 430, role: UserRole.parent);
+
+    await tester.tap(find.byTooltip('Download report card (PDF)'));
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    final all = _RoutedAdapter.requests.where((u) => u.path.endsWith('/report-card/pdf/')).toList();
+    expect(all, isNotEmpty);
+    expect(all.last.queryParameters['student_id'], '1');
+    expect(all.last.queryParameters.containsKey('exam_id'), isFalse);
+
+    await tester.ensureVisible(find.text('Printable marksheet (PDF)').first);
+    await tester.pump();
+    await tester.tap(find.text('Printable marksheet (PDF)').first);
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    final one = _RoutedAdapter.requests.where((u) => u.path.endsWith('/report-card/pdf/')).last;
+    expect(one.queryParameters['exam_id'], '7');
+    await tester.pump(const Duration(seconds: 3));
+  });
+
   group('exam model helpers', () {
     test('ordinal ranks', () {
       expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 101, 111].map(ordinal).toList(),
@@ -358,6 +446,22 @@ void main() {
       expect(row.rank, isNull);
       expect(row.outcome, ExamOutcome.incomplete);
       expect(row.subjects, hasLength(_subjects.length));
+    });
+
+    test('grade scale ranges run up to the next band', () {
+      const scale = GradeScale(isDefault: true, bands: [
+        GradeBand(label: 'A1', minPercentage: 91),
+        GradeBand(label: 'D', minPercentage: 33),
+        GradeBand(label: 'E', minPercentage: 0),
+      ]);
+      expect([scale.rangeOf(0), scale.rangeOf(1), scale.rangeOf(2)], ['91-100', '33-90', '0-32']);
+    });
+
+    test('grades are read from the API, never computed in the app', () {
+      final row = ResultRow.fromJson(_resultRow(rank: 1, result: 'PASS'));
+      expect(row.grade, 'A2');
+      expect(row.subjects.first.grade, 'A1');
+      expect(ResultRow.fromJson(_resultRow(rank: null, result: 'INCOMPLETE')).grade, isNull);
     });
 
     test('a period without times is never "now"', () {

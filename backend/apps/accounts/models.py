@@ -41,6 +41,15 @@ class User(AbstractUser):
         blank=True,
         help_text="User profile picture or avatar image",
     )
+    must_change_password = models.BooleanField(
+        default=False,
+        help_text="Set when the school issues a temporary password; cleared once the user picks their own.",
+    )
+    temporary_password_expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="A temporary password stops working after this moment.",
+    )
 
     class Meta:
         ordering = ['username']

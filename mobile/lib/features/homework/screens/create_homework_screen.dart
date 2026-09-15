@@ -4,7 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/role_access.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../classes/providers/classes_provider.dart';
+import '../../classes/providers/class_options_provider.dart';
 import '../providers/homework_provider.dart';
 import '../../students/providers/students_provider.dart';
 
@@ -139,7 +139,7 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final classesAsync = ref.watch(classesProvider);
+    final classesAsync = ref.watch(currentClassOptionsProvider);
     final classes = classesAsync.value ?? [];
     final studentsAsync = ref.watch(studentsProvider);
     final allStudents = studentsAsync.value ?? [];

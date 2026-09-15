@@ -47,6 +47,49 @@ def is_configured():
     return _credentials_path() is not None
 
 
+REQUIRED_KEYS = ('type', 'project_id', 'private_key', 'client_email')
+
+
+def configuration_problem():
+    """
+    Why push is not usable, in words safe to print - or None when it is.
+
+    Never includes any part of the credential: only whether the file exists,
+    parses, and has the fields a service account must have.
+    """
+    configured = getattr(settings, 'FIREBASE_SERVICE_ACCOUNT_FILE', '') or ''
+    if not configured:
+        return 'FIREBASE_SERVICE_ACCOUNT_FILE is not set.'
+    if _credentials_path() is None:
+        return 'FIREBASE_SERVICE_ACCOUNT_FILE points to a file that does not exist.'
+    try:
+        credentials = _load_credentials()
+    except (OSError, ValueError):
+        return 'The service-account file could not be read as JSON.'
+    missing = [key for key in REQUIRED_KEYS if not credentials.get(key)]
+    if missing:
+        return f"The service-account file is missing: {', '.join(missing)}."
+    if credentials.get('type') != 'service_account':
+        return 'The file is not a service-account key.'
+    return None
+
+
+def project_id():
+    """The Firebase project the credential belongs to (not secret)."""
+    try:
+        credentials = _load_credentials()
+    except (OSError, ValueError):
+        return None
+    return (credentials or {}).get('project_id')
+
+
+def reset_token_cache():
+    """Forget the cached OAuth token - after swapping in a rotated key."""
+    with _token_lock:
+        _token_cache['value'] = None
+        _token_cache['expires_at'] = 0.0
+
+
 def _load_credentials():
     path = _credentials_path()
     if path is None:
@@ -140,17 +183,48 @@ def _sign_jwt_for_token(credentials):
         return json.loads(response.read().decode()).get('access_token')
 
 
-def send_to_tokens(tokens, title, body, data=None):
+# FCM v1 error codes meaning the token itself is dead and should be retired.
+_DEAD_TOKEN_CODES = {'UNREGISTERED'}
+
+
+def _is_dead_token_error(http_status, payload):
+    """
+    Only retire a token when Firebase says the *token* is the problem.
+
+    401/403 mean our credential is wrong (for example an old, revoked key) and
+    500s are Firebase's problem: retiring every parent's phone on either would
+    silently end push for the whole school.
+    """
+    error = (payload or {}).get('error', {}) if isinstance(payload, dict) else {}
+    codes = {
+        detail.get('errorCode')
+        for detail in error.get('details', []) or []
+        if isinstance(detail, dict)
+    }
+    if codes & _DEAD_TOKEN_CODES:
+        return True
+    if http_status == 404:
+        return True
+    if http_status == 400 and 'registration token' in str(error.get('message', '')).lower():
+        return True
+    return False
+
+
+def send_to_tokens(tokens, title, body, data=None, validate_only=False):
     """
     Delivers one message to a list of device tokens.
 
-    Returns ``{'sent': int, 'failed': int, 'invalid_tokens': [...]}``. Tokens
-    Firebase reports as dead come back in ``invalid_tokens`` so the caller can
-    retire them - a phone that was wiped keeps its row forever otherwise.
+    Returns ``{'sent': int, 'failed': int, 'invalid_tokens': [...],
+    'auth_failed': bool}``. Tokens Firebase reports as dead come back in
+    ``invalid_tokens`` so the caller can retire them - a phone that was wiped
+    keeps its row forever otherwise.
+
+    ``validate_only`` asks Firebase to check the message and token without
+    delivering anything - how `manage.py check_push` tests a real device.
 
     Never raises: a failed push must not fail the request that triggered it.
     """
-    result = {'sent': 0, 'failed': 0, 'invalid_tokens': []}
+    result = {'sent': 0, 'failed': 0, 'invalid_tokens': [], 'auth_failed': False}
     tokens = [token for token in tokens if token]
     if not tokens:
         return result
@@ -179,6 +253,7 @@ def send_to_tokens(tokens, title, body, data=None):
         # token; batching belongs here only if that changes.
         for token in tokens:
             message = {
+                'validate_only': bool(validate_only),
                 'message': {
                     'token': token,
                     'notification': {'title': title, 'body': body},
@@ -203,8 +278,19 @@ def send_to_tokens(tokens, title, body, data=None):
                     result['sent'] += 1
             except urllib.error.HTTPError as exc:
                 result['failed'] += 1
-                # 404 UNREGISTERED / 400 INVALID_ARGUMENT mean the token is dead.
-                if exc.code in (400, 404):
+                try:
+                    payload = json.loads(exc.read().decode('utf-8') or '{}')
+                except (ValueError, OSError):
+                    payload = {}
+                if exc.code in (401, 403):
+                    # The credential is rejected; every further send would fail
+                    # the same way. Stop, and drop the cached token so a
+                    # rotated key is picked up on the next attempt.
+                    result['auth_failed'] = True
+                    reset_token_cache()
+                    logger.error("Push credential rejected by Firebase (HTTP %s).", exc.code)
+                    break
+                if _is_dead_token_error(exc.code, payload):
                     result['invalid_tokens'].append(token)
                 logger.warning("Push rejected for one device: HTTP %s", exc.code)
             except Exception as exc:  # network hiccup, DNS, timeout

@@ -301,7 +301,11 @@ class _Result extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${formatMarks(result.percentage)}% · ${formatMarks(result.total)}/${result.maxTotal}',
+                        [
+                          '${formatMarks(result.percentage)}%',
+                          if (result.grade != null) 'Grade ${result.grade}',
+                          '${formatMarks(result.total)}/${result.maxTotal}',
+                        ].join(' · '),
                         style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w800,

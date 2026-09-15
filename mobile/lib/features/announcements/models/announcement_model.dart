@@ -10,7 +10,9 @@ class AnnouncementModel {
   final String? targetClassName;
   final String createdByName;
   final DateTime publishedAt;
+  /// The backend's permission-checked download route - not a public link.
   final String? attachmentUrl;
+  final String? attachmentName;
   final String academicYear;
   final bool isActive;
 
@@ -25,6 +27,7 @@ class AnnouncementModel {
     this.createdByName = 'School Administration',
     required this.publishedAt,
     this.attachmentUrl,
+    this.attachmentName,
     this.academicYear = AppConstants.currentAcademicYear,
     this.isActive = true,
   });
@@ -63,7 +66,8 @@ class AnnouncementModel {
       targetClassName: json['target_class_name'],
       createdByName: json['created_by_name'] ?? 'School Administration',
       publishedAt: DateTime.tryParse(json['published_at'] ?? '') ?? DateTime.now(),
-      attachmentUrl: json['attachment'] ?? json['attachment_url'],
+      attachmentUrl: json['attachment_url']?.toString(),
+      attachmentName: json['attachment_name']?.toString(),
       academicYear: json['academic_year'] ?? AppConstants.currentAcademicYear,
       isActive: json['is_active'] ?? true,
     );
@@ -79,6 +83,7 @@ class AnnouncementModel {
       'target_class': targetClassId,
       'target_class_name': targetClassName,
       'attachment_url': attachmentUrl,
+      'attachment_name': attachmentName,
       'is_active': isActive,
     };
   }

@@ -197,4 +197,32 @@ void main() {
     });
   });
 
+
+  group('attachments', () {
+    test('use the permission-checked route, never a raw media path', () {
+      final notice = AnnouncementModel.fromJson({
+        'id': 5,
+        'title': 'Consent form',
+        'content': 'Sign and return',
+        'priority': 'NORMAL',
+        'audience_type': 'CLASS',
+        'attachment': 'http://server/media/announcements_attachments/consent.pdf',
+        'attachment_url': 'http://server/api/v1/announcements/5/attachment/',
+        'attachment_name': 'consent.pdf',
+      });
+      expect(notice.attachmentUrl, 'http://server/api/v1/announcements/5/attachment/');
+      expect(notice.attachmentName, 'consent.pdf');
+
+      final homework = HomeworkModel.fromJson({
+        'id': 9,
+        'title': 'Worksheet',
+        'subject': 'Maths',
+        'due_date': '2026-09-20',
+        'attachment_url': 'http://server/api/v1/homework/9/attachment/',
+        'attachment_name': 'sheet.pdf',
+      });
+      expect(homework.attachmentUrl, contains('/api/v1/homework/9/attachment/'));
+      expect(homework.attachmentName, 'sheet.pdf');
+    });
+  });
 }

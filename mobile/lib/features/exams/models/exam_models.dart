@@ -185,6 +185,8 @@ class SubjectMark {
     this.isAbsent = false,
     this.entered = false,
     this.passed,
+    this.percentage,
+    this.grade,
   });
 
   final String subject;
@@ -194,6 +196,10 @@ class SubjectMark {
   final bool isAbsent;
   final bool entered;
   final bool? passed;
+
+  /// This subject's own percentage and grade, from the backend's scale.
+  final double? percentage;
+  final String? grade;
 
   String get display => !entered ? '-' : (isAbsent ? 'AB' : formatMarks(marks));
 
@@ -206,6 +212,8 @@ class SubjectMark {
       isAbsent: json['is_absent'] == true,
       entered: json['entered'] == true,
       passed: json['passed'] as bool?,
+      percentage: _doubleOrNull(json['percentage']),
+      grade: json['grade']?.toString(),
     );
   }
 }
@@ -245,6 +253,7 @@ class ResultRow {
     required this.percentage,
     required this.outcome,
     this.rank,
+    this.grade,
   });
 
   final int studentId;
@@ -256,6 +265,9 @@ class ResultRow {
   final double percentage;
   final ExamOutcome outcome;
   final int? rank;
+
+  /// Overall grade; null until every paper is entered.
+  final String? grade;
 
   factory ResultRow.fromJson(Map<String, dynamic> json) {
     return ResultRow(
@@ -271,6 +283,7 @@ class ResultRow {
       percentage: _doubleOrNull(json['percentage']) ?? 0,
       outcome: ExamOutcome.parse(json['result']),
       rank: _intOrNull(json['rank']),
+      grade: json['grade']?.toString(),
     );
   }
 }
@@ -329,6 +342,7 @@ class ReportCardExam {
     required this.classSize,
     this.rank,
     this.startDate,
+    this.grade,
   });
 
   final int examId;
@@ -344,6 +358,7 @@ class ReportCardExam {
   final int classSize;
   final int? rank;
   final DateTime? startDate;
+  final String? grade;
 
   factory ReportCardExam.fromJson(Map<String, dynamic> json) {
     return ReportCardExam(
@@ -363,6 +378,7 @@ class ReportCardExam {
       classSize: _int(json['class_size']),
       rank: _intOrNull(json['rank']),
       startDate: _date(json['start_date']),
+      grade: json['grade']?.toString(),
     );
   }
 }
@@ -390,5 +406,54 @@ class ReportCard {
           .map(ReportCardExam.fromJson)
           .toList(),
     );
+  }
+}
+
+
+/// One step of the school's grading scale, e.g. A1 from 91%.
+class GradeBand {
+  const GradeBand({required this.label, required this.minPercentage, this.description = ''});
+
+  final String label;
+  final double minPercentage;
+  final String description;
+
+  factory GradeBand.fromJson(Map<String, dynamic> json) => GradeBand(
+        label: '${json['label'] ?? ''}',
+        minPercentage: _doubleOrNull(json['min_percentage']) ?? 0,
+        description: '${json['description'] ?? ''}',
+      );
+
+  Map<String, dynamic> toJson() => {
+        'label': label,
+        'min_percentage': minPercentage,
+        'description': description,
+      };
+}
+
+class GradeScale {
+  const GradeScale({required this.bands, required this.isDefault});
+
+  /// Highest band first.
+  final List<GradeBand> bands;
+
+  /// True while the school still uses the built-in default scale.
+  final bool isDefault;
+
+  factory GradeScale.fromJson(Map<String, dynamic> json) => GradeScale(
+        isDefault: json['is_default'] == true,
+        bands: (json['bands'] as List? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(GradeBand.fromJson)
+            .toList(),
+      );
+
+  /// "91-100", "81-90"... for display, from each band's lower bound.
+  String rangeOf(int index) {
+    final low = formatMarks(bands[index].minPercentage);
+    if (index == 0) return '$low-100';
+    final nextLow = bands[index - 1].minPercentage;
+    final high = nextLow == nextLow.roundToDouble() ? formatMarks(nextLow - 1) : formatMarks(nextLow - 0.1);
+    return '$low-$high';
   }
 }

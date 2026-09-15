@@ -82,6 +82,54 @@ and the parent's phone should buzz.
 - Tokens Firebase reports as dead are deleted automatically, so a wiped phone
   does not leave a row behind forever.
 
+## Rotating the service-account key
+
+Do this whenever a key may have been exposed (pasted into a chat, emailed,
+left on a shared machine). The key that was set up on 14 Sep 2026 must be
+treated as exposed.
+
+1. **Create the new key** - Firebase console > Project settings > Service
+   accounts > *Generate new private key*.
+2. **Store it outside the repository**, for example
+   `C:/secure/schoolconnect/firebase-service-account.json`, readable only by
+   the account that runs the backend.
+3. **Point the backend at it** in `backend/.env`:
+
+   ```
+   FIREBASE_SERVICE_ACCOUNT_FILE=C:/secure/schoolconnect/firebase-service-account.json
+   ```
+
+4. **Restart the backend**, then verify - it prints the project id and pass or
+   fail, never the key:
+
+   ```bash
+   python manage.py check_push
+   ```
+
+5. **Revoke the old key - this is the step that actually makes it useless.**
+   Google Cloud console > IAM & Admin > Service accounts >
+   `firebase-adminsdk-…@bizentrix-schoolconnect` > *Keys*. Delete every key
+   except the one created in step 1 (compare the creation dates).
+6. **Delete the old file** from the backend folder
+   (`backend/firebase-service-account.json`).
+7. Run `python manage.py check_push` again. It must still pass.
+
+Phones do not need to do anything: device tokens belong to the Firebase
+project, not to the key.
+
+What the backend guarantees:
+
+- The key is read from the file named in the environment and is never logged,
+  printed, returned by an API, or stored in the database.
+- `.gitignore` refuses `*service-account*.json`, `*firebase-adminsdk*.json`,
+  `google-services.json` and `.env` anywhere in the repository.
+- If Firebase rejects the credential (for example after the old key is
+  revoked but before the new one is installed), sending stops at once, the
+  cached token is dropped, and **no parent's device is retired** - only tokens
+  Firebase reports as dead (`UNREGISTERED`) are deactivated.
+- Signing out deletes the phone's registration; a deactivated account's
+  devices are deleted as well.
+
 ## If push stays silent
 
 | Symptom | Cause |

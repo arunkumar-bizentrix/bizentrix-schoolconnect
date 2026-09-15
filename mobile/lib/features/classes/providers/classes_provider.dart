@@ -5,6 +5,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/page_result.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../models/class_model.dart';
+import 'class_options_provider.dart';
 
 /// Class list state and admin-side class management.
 
@@ -40,7 +41,12 @@ class ClassesNotifier extends StateNotifier<AsyncValue<List<ClassModel>>> {
       _nextPageUrl = page.nextUrl;
       _totalCount = page.totalCount;
       if (!mounted) return;
-      state = AsyncValue.data([...?state.value, ...page.items]);
+      // A row the server repeats across a page boundary must not show twice.
+      final seen = {for (final item in state.value ?? const <ClassModel>[]) item.id};
+      state = AsyncValue.data([
+        ...?state.value,
+        ...page.items.where((item) => seen.add(item.id)),
+      ]);
     } catch (_) {
       // Keep what is already displayed; the next scroll retries.
     } finally {
@@ -48,10 +54,14 @@ class ClassesNotifier extends StateNotifier<AsyncValue<List<ClassModel>>> {
     }
   }
   final ApiClient apiClient;
+
+  /// Used to refresh the all-classes pickers after a class changes. Optional
+  /// so tests can build the notifier without a container.
+  final Ref? ref;
   String _currentAcademicYear = AppConstants.currentAcademicYear;
   String? _currentSection;
 
-  ClassesNotifier(this.apiClient) : super(const AsyncValue.loading()) {
+  ClassesNotifier(this.apiClient, [this.ref]) : super(const AsyncValue.loading()) {
     loadClasses();
   }
 
@@ -123,6 +133,7 @@ class ClassesNotifier extends StateNotifier<AsyncValue<List<ClassModel>>> {
       );
       if (response.statusCode == 201 || response.statusCode == 200) {
         await loadClasses();
+        ref?.invalidate(classOptionsProvider);
         return null;
       }
       return 'Unexpected server response (${response.statusCode}).';
@@ -154,6 +165,7 @@ class ClassesNotifier extends StateNotifier<AsyncValue<List<ClassModel>>> {
       );
       if (response.statusCode == 200) {
         await loadClasses();
+        ref?.invalidate(classOptionsProvider);
         return null;
       }
       return 'Unexpected server response (${response.statusCode}).';
@@ -168,6 +180,7 @@ class ClassesNotifier extends StateNotifier<AsyncValue<List<ClassModel>>> {
       final response = await apiClient.dio.delete(ApiEndpoints.classDetail(id));
       if (response.statusCode == 204 || response.statusCode == 200) {
         await loadClasses();
+        ref?.invalidate(classOptionsProvider);
         return null;
       }
       return 'Unexpected server response (${response.statusCode}).';
@@ -183,5 +196,5 @@ class ClassesNotifier extends StateNotifier<AsyncValue<List<ClassModel>>> {
 
 final classesProvider =
     StateNotifierProvider<ClassesNotifier, AsyncValue<List<ClassModel>>>((ref) {
-  return ClassesNotifier(ref.watch(apiClientProvider));
+  return ClassesNotifier(ref.watch(apiClientProvider), ref);
 });

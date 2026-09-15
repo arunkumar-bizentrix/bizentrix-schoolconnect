@@ -1,8 +1,10 @@
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import viewsets, permissions, filters
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from apps.notifications.services import NotificationService
+from apps.schools.downloads import serve_private_file
 from apps.schools.services import attach_user_to_school, get_school_for
 from apps.students.models import Class, Student, normalize_academic_year
 from .models import Homework
@@ -180,3 +182,20 @@ class HomeworkViewSet(viewsets.ModelViewSet):
 
         # Dispatch real-time in-app notifications to parents of this class
         NotificationService.create_homework_notifications(instance)
+
+    def perform_update(self, serializer):
+        """
+        The object permission checks the homework's current class; this checks
+        the class the edit would move it to.
+        """
+        user = self.request.user
+        if user.role == 'TEACHER':
+            classroom = serializer.validated_data.get('classroom', serializer.instance.classroom)
+            if not classroom or not classroom.teachers.filter(id=user.id).exists():
+                raise PermissionDenied("You can only move homework to classes assigned to you.")
+        serializer.save()
+
+    @action(detail=True, methods=['get'], url_path='attachment')
+    def attachment(self, request, pk=None):
+        """Downloads the attachment for someone allowed to see the homework."""
+        return serve_private_file(self.get_object().attachment)

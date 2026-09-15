@@ -8,6 +8,7 @@ class Notification(models.Model):
         ANNOUNCEMENT = 'ANNOUNCEMENT', 'Announcement'
         ATTENDANCE = 'ATTENDANCE', 'Attendance'
         RESULT = 'RESULT', 'Exam result'
+        MESSAGE = 'MESSAGE', 'Message'
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -45,6 +46,26 @@ class Notification(models.Model):
         blank=True,
         related_name='notifications',
         help_text="Associated attendance record (if applicable)",
+    )
+    student = models.ForeignKey(
+        'students.Student',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notifications',
+        help_text=(
+            "The child this is about, for per-child events (attendance, a "
+            "result, homework set for one student). Empty for class-wide and "
+            "school-wide events, which concern every child they reach."
+        ),
+    )
+    conversation = models.ForeignKey(
+        'messaging.Conversation',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='notifications',
+        help_text="Conversation with a new message (if applicable)",
     )
     exam = models.ForeignKey(
         'exams.Exam',

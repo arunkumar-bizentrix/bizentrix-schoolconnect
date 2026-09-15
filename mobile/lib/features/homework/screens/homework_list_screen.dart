@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/files/protected_file.dart';
 import '../../../shared/widgets/screen_header.dart';
 import '../../../shared/widgets/load_more_footer.dart';
 import '../../../shared/widgets/info_row.dart';
@@ -538,16 +539,18 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
               if (item.attachmentUrl != null && item.attachmentUrl!.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Attachment: ${item.attachmentUrl}'),
-                        backgroundColor: AppColors.primary,
-                      ),
-                    );
-                  },
+                  onPressed: () => openProtectedFile(
+                    context,
+                    url: item.attachmentUrl!,
+                    fileName: item.attachmentName ?? 'homework-attachment',
+                  ),
                   icon: const Icon(Icons.attach_file, size: 16),
-                  label: const Text('Open Attachment', style: TextStyle(fontSize: 12)),
+                  label: Text(
+                    item.attachmentName == null ? 'Open Attachment' : 'Open ${item.attachmentName}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
                     side: const BorderSide(color: AppColors.primary),

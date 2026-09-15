@@ -32,7 +32,9 @@ class HomeworkModel {
 
   /// Server-formatted deadline, e.g. "17 Sep 2026, 4:00 PM".
   final String dueDisplay;
+  /// The backend's permission-checked download route - not a public link.
   final String? attachmentUrl;
+  final String? attachmentName;
   final String academicYear;
   final bool isActive;
 
@@ -51,6 +53,7 @@ class HomeworkModel {
     this.dueTime,
     this.dueDisplay = '',
     this.attachmentUrl,
+    this.attachmentName,
     this.academicYear = AppConstants.currentAcademicYear,
     this.isActive = true,
   });
@@ -101,7 +104,8 @@ class HomeworkModel {
       dueDate: DateTime.tryParse(json['due_date'] ?? '') ?? DateTime.now().add(const Duration(days: 2)),
       dueTime: _parseTime(json['due_time']),
       dueDisplay: (json['due_display'] ?? '').toString(),
-      attachmentUrl: json['attachment'] ?? json['attachment_url'],
+      attachmentUrl: json['attachment_url']?.toString(),
+      attachmentName: json['attachment_name']?.toString(),
       academicYear: json['academic_year'] ?? AppConstants.currentAcademicYear,
       isActive: json['is_active'] ?? true,
     );
@@ -121,6 +125,7 @@ class HomeworkModel {
         'due_time':
             '${dueTime!.hour.toString().padLeft(2, '0')}:${dueTime!.minute.toString().padLeft(2, '0')}',
       'attachment_url': attachmentUrl,
+      'attachment_name': attachmentName,
       'is_active': isActive,
     };
   }

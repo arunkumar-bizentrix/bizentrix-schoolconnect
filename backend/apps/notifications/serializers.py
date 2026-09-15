@@ -4,6 +4,7 @@ from .models import DeviceToken, Notification
 
 class NotificationSerializer(serializers.ModelSerializer):
     target_id = serializers.SerializerMethodField()
+    student_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
@@ -17,6 +18,9 @@ class NotificationSerializer(serializers.ModelSerializer):
             'announcement',
             'attendance',
             'exam',
+            'conversation',
+            'student',
+            'student_name',
             'target_id',
             'created_at',
         ]
@@ -29,9 +33,15 @@ class NotificationSerializer(serializers.ModelSerializer):
             'announcement',
             'attendance',
             'exam',
+            'conversation',
+            'student',
+            'student_name',
             'target_id',
             'created_at',
         ]
+
+    def get_student_name(self, obj):
+        return obj.student.full_name if obj.student_id else None
 
     def get_target_id(self, obj):
         if obj.homework_id:
@@ -42,6 +52,8 @@ class NotificationSerializer(serializers.ModelSerializer):
             return obj.attendance_id
         if obj.exam_id:
             return obj.exam_id
+        if obj.conversation_id:
+            return obj.conversation_id
         return None
 
 

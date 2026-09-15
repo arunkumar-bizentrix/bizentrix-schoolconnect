@@ -6,6 +6,12 @@ class NotificationModel {
   final int? homeworkId;
   final int? announcementId;
   final int? attendanceId;
+  final int? examId;
+
+  /// The child this is about (attendance, a result, one-student homework).
+  /// Null for class-wide and school-wide events.
+  final int? studentId;
+  final String? studentName;
   final int? targetId;
   final bool isRead;
   final DateTime createdAt;
@@ -18,6 +24,9 @@ class NotificationModel {
     this.homeworkId,
     this.announcementId,
     this.attendanceId,
+    this.examId,
+    this.studentId,
+    this.studentName,
     this.targetId,
     this.isRead = false,
     required this.createdAt,
@@ -26,6 +35,7 @@ class NotificationModel {
   bool get isHomework => notificationType == 'HOMEWORK';
   bool get isAnnouncement => notificationType == 'ANNOUNCEMENT';
   bool get isAttendance => notificationType == 'ATTENDANCE';
+  bool get isResult => notificationType == 'RESULT';
 
   /// Attendance notices about an absence are the ones a parent must not miss.
   bool get isAbsence =>
@@ -51,6 +61,9 @@ class NotificationModel {
       homeworkId: homeworkId ?? this.homeworkId,
       announcementId: announcementId ?? this.announcementId,
       attendanceId: attendanceId ?? this.attendanceId,
+      examId: examId,
+      studentId: studentId,
+      studentName: studentName,
       targetId: targetId ?? this.targetId,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
@@ -66,6 +79,9 @@ class NotificationModel {
       homeworkId: json['homework'] as int?,
       announcementId: json['announcement'] as int?,
       attendanceId: json['attendance'] as int?,
+      examId: json['exam'] as int?,
+      studentId: json['student'] as int?,
+      studentName: json['student_name'] as String?,
       targetId: json['target_id'] as int?,
       isRead: json['is_read'] as bool? ?? false,
       createdAt: json['created_at'] != null
@@ -83,6 +99,9 @@ class NotificationModel {
       'homework': homeworkId,
       'announcement': announcementId,
       'attendance': attendanceId,
+      'exam': examId,
+      'student': studentId,
+      'student_name': studentName,
       'target_id': targetId,
       'is_read': isRead,
       'created_at': createdAt.toIso8601String(),

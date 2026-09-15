@@ -7,3 +7,6 @@ psycopg[binary]>=3.2.1
 
 # Signs the OAuth token that Firebase Cloud Messaging requires (apps/notifications/push.py)
 google-auth>=2.35,<3
+
+# Printable report cards (apps/exams/pdf.py)
+reportlab>=4.2,<5

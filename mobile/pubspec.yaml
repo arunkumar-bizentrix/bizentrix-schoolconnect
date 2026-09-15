@@ -33,6 +33,8 @@ dependencies:
   # Files & Attachments
   file_picker: ^8.0.3
   open_filex: ^4.5.0
+  # Opens protected downloads (attachments, report cards) in the browser build.
+  web: ^1.1.1
   path_provider: ^2.1.3
   permission_handler: ^11.3.1
 
@@ -54,4 +56,3 @@ flutter:
 
   assets:
     - assets/images/
-    - assets/icons/

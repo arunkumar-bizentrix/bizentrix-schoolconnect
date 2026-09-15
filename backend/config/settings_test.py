@@ -36,11 +36,20 @@ WHATSAPP_PHONE_NUMBER_ID = None
 
 # No push leaves the test suite, whatever the developer has configured locally.
 FIREBASE_SERVICE_ACCOUNT_FILE = ''
+PUSH_IN_BACKGROUND = False
+SMS_PROVIDER = ''
 
 # Throttling stays wired up (the views declare it explicitly) but the rates are
 # lifted so they never interfere with functional assertions. The throttle tests
 # pin low rates locally with @override_settings.
 REST_FRAMEWORK = {  # noqa: F405
     **REST_FRAMEWORK,  # noqa: F405
-    'DEFAULT_THROTTLE_RATES': {'auth': '10000/min', 'otp': '10000/min'},
+    'DEFAULT_THROTTLE_RATES': {'auth': '10000/min', 'otp': '10000/min', 'messages': '10000/min'},
 }
+
+# Uploaded files from tests go to a throwaway folder, never the real media
+# directory the development server serves.
+import tempfile as _tempfile
+from pathlib import Path as _Path
+
+MEDIA_ROOT = _Path(_tempfile.mkdtemp(prefix='schoolconnect-test-media-'))

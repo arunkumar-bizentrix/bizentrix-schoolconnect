@@ -7,7 +7,9 @@ import '../../../shared/widgets/load_more_footer.dart';
 import '../../../core/utils/role_access.dart';
 import '../providers/announcements_provider.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../classes/providers/classes_provider.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../classes/models/class_model.dart';
+import '../../classes/providers/class_options_provider.dart';
 import '../models/announcement_model.dart';
 import 'announcement_detail_screen.dart';
 
@@ -367,7 +369,7 @@ class _AnnouncementsListScreenState extends ConsumerState<AnnouncementsListScree
     );
   }
 
-  void _showAddAnnouncementDialog(BuildContext context) {
+  Future<void> _showAddAnnouncementDialog(BuildContext context) async {
     final titleCtrl = TextEditingController();
     final contentCtrl = TextEditingController();
     final user = ref.read(authProvider).user;
@@ -376,12 +378,18 @@ class _AnnouncementsListScreenState extends ConsumerState<AnnouncementsListScree
     String audience = isTeacher ? 'CLASS' : 'SCHOOL';
     int? selectedClassId;
     final formKey = GlobalKey<FormState>();
-    final classes = ref.read(classesProvider).value ?? [];
+    List<ClassModel> classes = const [];
+    try {
+      classes = await ref.read(classOptionsProvider(AppConstants.currentAcademicYear).future);
+    } catch (_) {
+      // School-wide notices still work without the class list.
+    }
+    if (!context.mounted) return;
     if (classes.isNotEmpty) {
       selectedClassId = classes.first.id;
     }
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(

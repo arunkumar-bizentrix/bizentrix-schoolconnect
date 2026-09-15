@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    ChangePasswordView,
     LoginView,
     UserProfileView,
     SendOTPView,
@@ -16,6 +17,7 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='auth_login'),
     path('register/', RegisterView.as_view(), name='auth_register'),
     path('me/', UserProfileView.as_view(), name='auth_me'),
+    path('change-password/', ChangePasswordView.as_view(), name='auth_change_password'),
 
     # Admin-only staff picker (assign teacher to class, link parent to student)
     path('staff/', SchoolStaffListView.as_view(), name='auth_staff_list'),

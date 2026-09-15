@@ -361,7 +361,8 @@ class RankingTests(ExamTestBase):
             Mark.objects.bulk_create([
                 Mark(paper=paper, student=s, marks_obtained=50) for s in students
             ])
-        with self.assertNumQueries(3):
+        # papers, marks, students, and the grading scale - never one per student.
+        with self.assertNumQueries(4):
             compute_class_results(self.exam, self.classroom)
 
 
@@ -400,7 +401,7 @@ class PublishingTests(ExamTestBase):
         note = Notification.objects.get(recipient=self.parent)
         self.assertEqual(note.notification_type, 'RESULT')
         self.assertEqual(note.title, 'Quarterly Exam results are out')
-        self.assertEqual(note.message, 'Kavya scored 180/200 (90%) · Rank 1 of 4.')
+        self.assertEqual(note.message, 'Kavya scored 180/200 (90%) · Grade A2 · Rank 1 of 4.')
         self.assertFalse(Notification.objects.filter(recipient=self.other_parent).exists())
 
     def test_teacher_cannot_publish(self):

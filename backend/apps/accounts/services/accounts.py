@@ -8,8 +8,12 @@ the school as staff.
 
 import re
 import secrets
+from datetime import timedelta
 
+from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 from ..models import User
 
@@ -83,6 +87,8 @@ def create_school_account(*, school, role, full_name, phone_number, email=''):
     user = User.objects.create_user(
         username=unique_username(full_name, fallback=role.lower()),
         password=password,
+        must_change_password=True,
+        temporary_password_expires_at=_temporary_expiry(),
         first_name=first_name,
         last_name=last_name,
         email=email,
@@ -94,11 +100,44 @@ def create_school_account(*, school, role, full_name, phone_number, email=''):
     return user, password
 
 
+def _temporary_expiry():
+    return timezone.now() + timedelta(days=getattr(settings, 'TEMPORARY_PASSWORD_DAYS', 7))
+
+
+def revoke_sessions(user):
+    """
+    Signs the user out everywhere: every refresh token they hold is
+    blacklisted, so no device can mint a new access token. (An access token
+    already issued lives at most ACCESS_TOKEN_LIFETIME; a deactivated user's
+    is refused immediately.)
+    """
+    tokens = OutstandingToken.objects.filter(user=user).exclude(blacklistedtoken__isnull=False)
+    BlacklistedToken.objects.bulk_create(
+        [BlacklistedToken(token=token) for token in tokens], ignore_conflicts=True,
+    )
+
+
+@transaction.atomic
 def reset_temporary_password(user):
-    """Issues a fresh one-time password; the old one stops working at once."""
+    """
+    Issues a fresh temporary password. The old password stops working at once,
+    every existing session is signed out, and the user must choose their own
+    password at the next sign-in.
+    """
     if user.role not in MANAGED_ROLES:
         raise AccountError('Only teacher and parent passwords can be reset here.')
     password = generate_temporary_password()
     user.set_password(password)
-    user.save(update_fields=['password'])
+    user.must_change_password = True
+    user.temporary_password_expires_at = _temporary_expiry()
+    user.save(update_fields=['password', 'must_change_password', 'temporary_password_expires_at'])
+    revoke_sessions(user)
     return password
+
+
+def temporary_password_expired(user):
+    return bool(
+        user.must_change_password
+        and user.temporary_password_expires_at
+        and user.temporary_password_expires_at <= timezone.now()
+    )

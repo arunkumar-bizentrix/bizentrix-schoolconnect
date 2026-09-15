@@ -425,6 +425,38 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Replaces the user's password. On success the backend signs out every
+  /// other session and returns fresh tokens for this device, which are kept.
+  /// Returns null on success or the reason it failed.
+  Future<String?> changePassword({required String currentPassword, required String newPassword}) async {
+    try {
+      final response = await apiClient.dio.post(
+        ApiEndpoints.changePassword,
+        data: {'current_password': currentPassword, 'new_password': newPassword},
+      );
+      final data = Map<String, dynamic>.from(response.data as Map);
+      await tokenStorage.saveTokens(
+        accessToken: data['access'].toString(),
+        refreshToken: data['refresh']?.toString(),
+      );
+      final userJson = Map<String, dynamic>.from(data['user'] as Map);
+      await tokenStorage.saveUserProfileJson(jsonEncode(userJson));
+      state = AuthState(user: UserModel.fromJson(userJson));
+      return null;
+    } catch (e) {
+      final error = e;
+      if (error is DioException && error.response?.statusCode == 400 && error.response?.data is Map) {
+        final body = error.response!.data as Map;
+        final messages = [
+          for (final key in ['current_password', 'new_password', 'detail'])
+            if (body[key] != null) (body[key] is List ? (body[key] as List).join(' ') : body[key].toString()),
+        ];
+        if (messages.isNotEmpty) return messages.join(' ');
+      }
+      return apiClient.handleError(e).message;
+    }
+  }
+
   Future<void> logout() async {
     // Hand the device back before the token goes: the DELETE needs this
     // user's credentials, and whoever signs in next on this phone must not

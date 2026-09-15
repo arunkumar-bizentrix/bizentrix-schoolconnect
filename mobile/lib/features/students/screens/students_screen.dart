@@ -5,7 +5,9 @@ import '../../../core/constants/app_colors.dart';
 import '../../../shared/widgets/load_more_footer.dart';
 import '../../../core/utils/role_access.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../classes/providers/classes_provider.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../classes/models/class_model.dart';
+import '../../classes/providers/class_options_provider.dart';
 import '../../auth/providers/staff_provider.dart';
 import 'import_roll_sheet.dart';
 import '../../../shared/widgets/screen_header.dart';
@@ -52,7 +54,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
   @override
   Widget build(BuildContext context) {
     final studentsAsync = ref.watch(studentsProvider);
-    final classesAsync = ref.watch(classesProvider);
+    final classesAsync = ref.watch(currentClassOptionsProvider);
     final userRole = ref.watch(authProvider).role;
     final isParent = userRole.isParent;
     final isAdmin = userRole.isAdmin;
@@ -154,20 +156,21 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                 // Dynamic Class Chips from Real Classes API
                 classesAsync.when(
                   data: (classes) {
-                    final allStudents = studentsAsync.value ?? [];
+                    // Counts come from the server. Counting the loaded page
+                    // would say "20" for a class of 38.
+                    final total = classes.fold<int>(0, (sum, cls) => sum + cls.studentCount);
                     return SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
                           _buildFilterChip(
-                            label: 'All (${allStudents.length})',
+                            label: 'All ($total)',
                             isSelected: _selectedClassId == null,
                             onTap: () => _onClassFilterSelected(null),
                           ),
                           ...classes.map((cls) {
-                            final count = allStudents.where((s) => s.classId == cls.id).length;
                             return _buildFilterChip(
-                              label: '${cls.displayName} ($count)',
+                              label: '${cls.displayName} (${cls.studentCount})',
                               isSelected: _selectedClassId == cls.id,
                               onTap: () => _onClassFilterSelected(cls.id),
                             );
@@ -541,13 +544,25 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
     );
   }
 
-  void _showAddStudentDialog(BuildContext context, WidgetRef ref) {
+  Future<void> _showAddStudentDialog(BuildContext context, WidgetRef ref) async {
     final firstCtrl = TextEditingController();
     final lastCtrl = TextEditingController();
     final admCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
-    final classes = ref.read(classesProvider).value ?? [];
+    // Every class, not the first page: enrolment into Grade 12-B must work in
+    // a school with more than 20 sections.
+    final List<ClassModel> classes;
+    try {
+      classes = await ref.read(classOptionsProvider(AppConstants.currentAcademicYear).future);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load classes. Check the connection and try again.')),
+      );
+      return;
+    }
+    if (!context.mounted) return;
     if (classes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please add at least one class before enrolling students.')),
@@ -557,7 +572,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
 
     int selectedClassId = classes.first.id;
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (dialogCtx, setDialogState) => AlertDialog(

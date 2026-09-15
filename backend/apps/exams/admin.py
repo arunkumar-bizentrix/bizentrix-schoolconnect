@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Exam, ExamPaper, Mark
+from .models import Exam, ExamPaper, GradeBand, Mark
 
 
 class ExamPaperInline(admin.TabularInline):
@@ -23,3 +23,9 @@ class MarkAdmin(admin.ModelAdmin):
     list_filter = ('paper__exam', 'is_absent')
     search_fields = ('student__first_name', 'student__admission_number')
     raw_id_fields = ('student', 'paper', 'entered_by')
+
+
+@admin.register(GradeBand)
+class GradeBandAdmin(admin.ModelAdmin):
+    list_display = ('label', 'min_percentage', 'description', 'school')
+    list_filter = ('school',)

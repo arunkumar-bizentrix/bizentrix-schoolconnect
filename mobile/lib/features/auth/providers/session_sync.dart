@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../announcements/providers/announcements_provider.dart';
+import '../../classes/providers/class_options_provider.dart';
 import '../../classes/providers/classes_provider.dart';
 import '../../homework/providers/homework_provider.dart';
 import '../../notifications/providers/notifications_provider.dart';
@@ -21,6 +22,7 @@ import 'staff_provider.dart';
 /// Add to this list whenever a new provider caches per-user data.
 final List<ProviderOrFamily> userScopedProviders = <ProviderOrFamily>[
   classesProvider,
+  classOptionsProvider,
   studentsProvider,
   homeworkProvider,
   announcementsProvider,

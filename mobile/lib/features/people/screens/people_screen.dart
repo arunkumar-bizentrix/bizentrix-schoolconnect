@@ -190,10 +190,10 @@ class _PeopleList extends ConsumerWidget {
                     action: 'Reset',
                   );
                   if (!confirmed) return;
-                  final result = await ref.read(peopleProvider(role).notifier).resetPassword(person.id);
+                  final result = await ref.read(peopleProvider(role).notifier).resetPassword(person);
                   if (!context.mounted) return;
                   if (result.isOk) {
-                    await showLoginDetails(context, person: person, password: result.value!, isNew: false);
+                    await showLoginDetails(context, issued: result.value!, isNew: false);
                   } else {
                     _toast(context, result.error!, error: true);
                   }
@@ -473,12 +473,7 @@ class _PersonFormState extends ConsumerState<_PersonForm> {
     Navigator.pop(context);
     final issued = result.value!;
     if (widget.hostContext.mounted) {
-      await showLoginDetails(
-        widget.hostContext,
-        person: issued.account,
-        password: issued.temporaryPassword,
-        isNew: true,
-      );
+      await showLoginDetails(widget.hostContext, issued: issued, isNew: true);
     }
   }
 
@@ -571,18 +566,22 @@ class _PersonFormState extends ConsumerState<_PersonForm> {
 // login details
 // ---------------------------------------------------------------------------
 
-/// Shows the one-time password - the only time it is ever visible.
+/// Tells the admin how the temporary password reaches the person.
+///
+/// Sent by SMS: say so, and show nothing secret. Not sent: show the password
+/// this once, with a clear warning that it was not texted.
 Future<void> showLoginDetails(
   BuildContext context, {
-  required StaffModel person,
-  required String password,
+  required IssuedLogin issued,
   required bool isNew,
 }) {
+  final person = issued.account;
   final signInWith = person.phoneNumber.isNotEmpty ? person.phoneNumber : person.username;
-  final message = 'Vivekananda School app login\n'
-      'Name: ${person.fullName}\n'
-      'Mobile number: $signInWith\n'
-      'Password: $password';
+  final password = issued.temporaryPassword;
+  final expires = issued.expiresAt;
+  final expiresText = expires == null
+      ? ''
+      : ' It works until ${expires.day}/${expires.month}/${expires.year}, and they must choose their own password when they sign in.';
 
   return showDialog(
     context: context,
@@ -591,32 +590,65 @@ Future<void> showLoginDetails(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Text(
-        isNew ? 'Account created' : 'New password issued',
+        issued.sentBySms
+            ? (isNew ? 'Account created' : 'Password reset')
+            : (isNew ? 'Account created' : 'New password issued'),
         style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Give these to ${person.fullName}. The password is shown only now.',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
-          ),
-          const SizedBox(height: 16),
-          _LoginLine(label: 'Mobile number', value: signInWith),
-          const SizedBox(height: 10),
-          _LoginLine(label: 'Password', value: password, emphasise: true),
+          if (issued.sentBySms) ...[
+            Text(
+              'A temporary password was sent by SMS to $signInWith.$expiresText',
+              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+            ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: AppColors.statHomeworkBg, borderRadius: BorderRadius.circular(10)),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.sms_failed_outlined, size: 18, color: AppColors.statHomeworkText),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Not sent by SMS${issued.smsDetail == null ? '' : ' - ${issued.smsDetail}'} '
+                      'Give these details to ${person.fullName} yourself. The password is shown only now.',
+                      style: const TextStyle(fontSize: 12.5, color: AppColors.statHomeworkText, height: 1.35),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _LoginLine(label: 'Mobile number', value: signInWith),
+            const SizedBox(height: 10),
+            _LoginLine(label: 'Temporary password', value: password ?? '-', emphasise: true),
+            if (expiresText.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(expiresText.trim(), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.35)),
+            ],
+          ],
         ],
       ),
       actions: [
-        TextButton.icon(
-          onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: message));
-            if (dialogContext.mounted) _toast(dialogContext, 'Login details copied');
-          },
-          icon: const Icon(Icons.copy_rounded, size: 18),
-          label: const Text('Copy'),
-        ),
+        if (!issued.sentBySms && password != null)
+          TextButton.icon(
+            onPressed: () async {
+              final message = 'Vivekananda School app login\n'
+                  'Name: ${person.fullName}\n'
+                  'Mobile number: $signInWith\n'
+                  'Temporary password: $password\n'
+                  'You will be asked to choose your own password after signing in.';
+              await Clipboard.setData(ClipboardData(text: message));
+              if (dialogContext.mounted) _toast(dialogContext, 'Login details copied');
+            },
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            label: const Text('Copy'),
+          ),
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext),
           style: FilledButton.styleFrom(backgroundColor: AppColors.primary),

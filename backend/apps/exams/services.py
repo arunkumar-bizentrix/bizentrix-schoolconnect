@@ -18,6 +18,7 @@ from apps.notifications.models import Notification
 from apps.students.models import Student
 from apps.timetable.models import TimetableSlot
 
+from .grading import bands_for_school, grade_for
 from .models import ExamPaper, Mark
 
 logger = logging.getLogger('schoolconnect.exams')
@@ -70,12 +71,13 @@ def _one_decimal(value):
     return float(Decimal(value).quantize(Decimal('0.1'), rounding=ROUND_HALF_UP))
 
 
-def compute_class_results(exam, classroom, papers=None):
+def compute_class_results(exam, classroom, papers=None, bands=None):
     """
     Every student's result for one class in one exam, best first.
 
     Returns ``{'papers': [...], 'max_total': n, 'rows': [...]}``. Each row has
-    per-subject marks, total, percentage, result and rank.
+    per-subject marks and grades, total, percentage, overall grade, result and
+    rank. Grades never influence the rank, which is by total marks alone.
 
     Rank uses standard competition ranking - two students on 450 are both 2nd
     and the next is 4th, which is how Indian schools announce it. Only
@@ -86,6 +88,8 @@ def compute_class_results(exam, classroom, papers=None):
         papers = list(
             ExamPaper.objects.filter(exam=exam, classroom=classroom).select_related('subject')
         )
+    if bands is None:
+        bands = bands_for_school(exam.school_id)
     paper_ids = [paper.id for paper in papers]
     max_total = sum(paper.max_marks for paper in papers)
 
@@ -114,6 +118,8 @@ def compute_class_results(exam, classroom, papers=None):
                     'max_marks': paper.max_marks,
                     'pass_marks': paper.pass_marks,
                     'marks_obtained': None,
+                    'percentage': None,
+                    'grade': None,
                     'is_absent': False,
                     'entered': False,
                     'passed': None,
@@ -128,12 +134,20 @@ def compute_class_results(exam, classroom, papers=None):
             )
             failed = failed or not passed
             total += obtained or 0
+            # Each subject is graded on its own percentage, so a practical
+            # out of 50 is graded like a theory paper out of 100.
+            subject_percentage = (
+                _one_decimal(obtained * 100 / paper.max_marks)
+                if obtained is not None and paper.max_marks else None
+            )
             subjects.append({
                 'paper': paper.id,
                 'subject': paper.subject.name,
                 'max_marks': paper.max_marks,
                 'pass_marks': paper.pass_marks,
                 'marks_obtained': float(obtained) if obtained is not None else None,
+                'percentage': subject_percentage,
+                'grade': grade_for(subject_percentage, bands),
                 'is_absent': mark.is_absent,
                 'entered': True,
                 'passed': passed,
@@ -145,6 +159,7 @@ def compute_class_results(exam, classroom, papers=None):
         else:
             result = FAIL if failed else PASS
 
+        percentage = _one_decimal(total * 100 / max_total) if max_total else 0.0
         rows.append({
             'student': student.id,
             'student_name': student.full_name,
@@ -152,7 +167,10 @@ def compute_class_results(exam, classroom, papers=None):
             'subjects': subjects,
             'total': _one_decimal(total),
             'max_total': max_total,
-            'percentage': _one_decimal(total * 100 / max_total) if max_total else 0.0,
+            'percentage': percentage,
+            # No overall grade until every paper is in - a partial total would
+            # grade the student on the subjects that happen to be entered.
+            'grade': grade_for(percentage, bands) if complete else None,
             'result': result,
             'rank': None,
             'is_complete': complete,
@@ -185,8 +203,9 @@ def missing_marks(exam):
     for paper in exam.papers.select_related('classroom', 'subject'):
         papers_by_class[paper.classroom].append(paper)
 
+    bands = bands_for_school(exam.school_id)
     for classroom, papers in papers_by_class.items():
-        rows = compute_class_results(exam, classroom, papers)['rows']
+        rows = compute_class_results(exam, classroom, papers, bands)['rows']
         count = sum(
             1 for row in rows for subject in row['subjects'] if not subject['entered']
         )
@@ -246,8 +265,9 @@ def notify_results(exam):
         for paper in exam.papers.select_related('classroom', 'subject'):
             papers_by_class[paper.classroom].append(paper)
 
+        bands = bands_for_school(exam.school_id)
         for classroom, papers in papers_by_class.items():
-            results = compute_class_results(exam, classroom, papers)
+            results = compute_class_results(exam, classroom, papers, bands)
             students = {
                 student.id: student
                 for student in Student.objects.filter(
@@ -260,6 +280,8 @@ def notify_results(exam):
                     continue
                 first_name = student.first_name or student.full_name
                 summary = f"{first_name} scored {row['total']:g}/{row['max_total']} ({row['percentage']:g}%)"
+                if row['grade']:
+                    summary += f" · Grade {row['grade']}"
                 if row['rank']:
                     summary += f" · Rank {row['rank']} of {results['ranked_count']}"
                 summary += '.'
@@ -273,6 +295,7 @@ def notify_results(exam):
                         title=f'{exam.name} results are out',
                         message=summary,
                         exam=exam,
+                        student=student,
                     ))
 
         if not notifications:
@@ -322,8 +345,11 @@ def report_card(student, *, published_only):
         grouped[key].append(paper)
 
     cards = []
+    bands_by_school = {}
     for exam, classroom in order:
-        results = compute_class_results(exam, classroom, grouped[(exam, classroom)])
+        if exam.school_id not in bands_by_school:
+            bands_by_school[exam.school_id] = bands_for_school(exam.school_id)
+        results = compute_class_results(exam, classroom, grouped[(exam, classroom)], bands_by_school[exam.school_id])
         row = next((r for r in results['rows'] if r['student'] == student.id), None)
         if row is None:
             continue
@@ -338,7 +364,7 @@ def report_card(student, *, published_only):
             'classroom_name': f'{classroom.name} - {classroom.section}',
             'class_size': results['ranked_count'],
             **{key: row[key] for key in (
-                'subjects', 'total', 'max_total', 'percentage', 'result', 'rank', 'is_complete',
+                'subjects', 'total', 'max_total', 'percentage', 'grade', 'result', 'rank', 'is_complete',
             )},
         })
     return cards

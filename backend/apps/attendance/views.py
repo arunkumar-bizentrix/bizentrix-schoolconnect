@@ -3,7 +3,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import MethodNotAllowed, PermissionDenied
 from rest_framework.response import Response
 
 from apps.notifications.services import NotificationService
@@ -12,7 +12,7 @@ from apps.students.models import Class, Student
 
 from .models import Attendance
 from .permissions import IsAttendanceAuthorized
-from .serializers import AttendanceSerializer, MarkAttendanceSerializer
+from .serializers import AttendanceCorrectionSerializer, AttendanceSerializer, MarkAttendanceSerializer
 
 
 class AttendanceViewSet(viewsets.ModelViewSet):
@@ -27,6 +27,23 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
     serializer_class = AttendanceSerializer
     permission_classes = [permissions.IsAuthenticated, IsAttendanceAuthorized]
+
+    def get_serializer_class(self):
+        if self.action in ('update', 'partial_update'):
+            return AttendanceCorrectionSerializer
+        return AttendanceSerializer
+
+    def create(self, request, *args, **kwargs):
+        # Attendance is taken a class at a time through mark/, which checks the
+        # class, the students in it, and notifies parents. A bare create did
+        # none of that.
+        raise MethodNotAllowed('POST', detail="Mark attendance through /api/v1/attendance/mark/.")
+
+    def perform_update(self, serializer):
+        previous_status = serializer.instance.status
+        record = serializer.save(marked_by=self.request.user)
+        if record.status != previous_status:
+            NotificationService.create_attendance_notifications([record])
 
     def get_queryset(self):
         user = self.request.user

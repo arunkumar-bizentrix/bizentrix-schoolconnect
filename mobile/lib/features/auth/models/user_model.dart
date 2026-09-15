@@ -10,6 +10,10 @@ class UserModel {
   final String? phoneNumber;
   final String? avatarUrl;
 
+  /// The school issued a temporary password; the user must choose their own
+  /// before the backend lets them do anything else.
+  final bool mustChangePassword;
+
   const UserModel({
     required this.id,
     required this.email,
@@ -19,6 +23,7 @@ class UserModel {
     this.schoolName,
     this.phoneNumber,
     this.avatarUrl,
+    this.mustChangePassword = false,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -53,6 +58,7 @@ class UserModel {
       avatarUrl: (customAvatar != null && customAvatar.toString().isNotEmpty)
           ? customAvatar.toString()
           : null,
+      mustChangePassword: json['must_change_password'] == true,
     );
   }
 
@@ -84,6 +90,7 @@ class UserModel {
     String? schoolName,
     String? phoneNumber,
     String? avatarUrl,
+    bool? mustChangePassword,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -94,6 +101,7 @@ class UserModel {
       schoolName: schoolName ?? this.schoolName,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
     );
   }
 
@@ -108,6 +116,7 @@ class UserModel {
       'phone_number': phoneNumber,
       'avatar_url': avatarUrl,
       'profile_picture_url': avatarUrl,
+      'must_change_password': mustChangePassword,
     };
   }
 }

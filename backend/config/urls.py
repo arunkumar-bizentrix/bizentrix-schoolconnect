@@ -37,7 +37,14 @@ urlpatterns = [
     # Subjects & Weekly Timetable Endpoints
     path('api/v1/', include('apps.timetable.urls')),
     path('api/v1/', include('apps.exams.urls')),
+    path('api/v1/', include('apps.messaging.urls')),
 ]
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Profile pictures only. Homework and announcement attachments are served
+    # through their permission-checked /attachment/ routes; a plain media URL
+    # would let anyone holding the link open another class's documents.
+    urlpatterns += static(
+        f'{settings.MEDIA_URL}profile_pictures/',
+        document_root=settings.MEDIA_ROOT / 'profile_pictures',
+    )

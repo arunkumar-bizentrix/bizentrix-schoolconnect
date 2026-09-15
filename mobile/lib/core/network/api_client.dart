@@ -136,6 +136,15 @@ class ApiClient {
           final responseData = error.response?.data;
 
           if (statusCode == 401) {
+            final code = responseData is Map ? responseData['code']?.toString() : null;
+            final detail = responseData is Map ? responseData['detail']?.toString() : null;
+            if (code == 'no_active_account') {
+              return const AuthFailure('Wrong mobile number or password.');
+            }
+            // e.g. "Your temporary password has expired. Ask the school office to reset it."
+            if (code == 'temporary_password_expired' && detail != null) {
+              return AuthFailure(detail);
+            }
             return const AuthFailure('Session expired or unauthorized. Please log in.');
           }
           if (statusCode == 403) {

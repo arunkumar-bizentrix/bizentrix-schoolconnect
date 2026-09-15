@@ -156,6 +156,7 @@ class LatestResult {
     required this.outcome,
     required this.classSize,
     this.rank,
+    this.grade,
   });
 
   final String examName;
@@ -165,6 +166,7 @@ class LatestResult {
   final ExamOutcome outcome;
   final int classSize;
   final int? rank;
+  final String? grade;
 
   factory LatestResult.fromJson(Map<String, dynamic> json) {
     return LatestResult(
@@ -175,6 +177,7 @@ class LatestResult {
       outcome: ExamOutcome.parse(json['result']),
       classSize: (json['class_size'] as num?)?.toInt() ?? 0,
       rank: (json['rank'] as num?)?.toInt(),
+      grade: json['grade']?.toString(),
     );
   }
 }

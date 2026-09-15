@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.schools.services import get_school_for
 from django.core.exceptions import ValidationError as DjangoValidationError
+from apps.schools.downloads import private_file_url
 from .models import Announcement
 from .validators import validate_announcement_attachment
 
@@ -14,7 +15,10 @@ class AnnouncementSerializer(serializers.ModelSerializer):
     attachment_url = serializers.SerializerMethodField()
     is_active = serializers.BooleanField(default=True, required=False)
 
+    attachment_name = serializers.SerializerMethodField()
+
     class Meta:
+        extra_kwargs = {'attachment': {'write_only': True}}
         model = Announcement
         fields = [
             'id',
@@ -27,6 +31,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             'published_at',
             'attachment',
             'attachment_url',
+            'attachment_name',
             'priority',
             'audience_type',
             'target_class',
@@ -45,12 +50,14 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         return full_name or obj.created_by.username
 
     def get_attachment_url(self, obj):
+        # The permission-checked download route, never the /media/ path.
         if not obj.attachment:
             return None
-        request = self.context.get('request')
-        if request:
-            return request.build_absolute_uri(obj.attachment.url)
-        return obj.attachment.url
+        return private_file_url(self.context.get('request'), f'/api/v1/announcements/{obj.id}/attachment/')
+
+    def get_attachment_name(self, obj):
+        import os
+        return os.path.basename(obj.attachment.name) if obj.attachment else None
 
     def validate_attachment(self, value):
         if value:

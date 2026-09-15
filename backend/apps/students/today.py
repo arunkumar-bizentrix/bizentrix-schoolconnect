@@ -107,7 +107,7 @@ def build_child_today(child, today):
             key: latest[key]
             for key in (
                 'exam', 'exam_name', 'total', 'max_total', 'percentage',
-                'rank', 'class_size', 'result',
+                'grade', 'rank', 'class_size', 'result',
             )
         }
 

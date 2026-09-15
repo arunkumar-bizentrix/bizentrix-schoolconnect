@@ -1,10 +1,15 @@
 import re
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from datetime import timedelta
 from django.contrib.auth import authenticate
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from apps.schools.models import School
+from .services.accounts import temporary_password_expired
 from apps.schools.services import attach_user_to_school, get_default_school, get_school_id_for
 
 from .models import User, OTPVerification
@@ -40,12 +45,31 @@ class UserSerializer(serializers.ModelSerializer):
             'profile_picture',
             'profile_picture_url',
             'is_active',
+            'must_change_password',
         ]
-        read_only_fields = ['id', 'username', 'role', 'school', 'is_active']
+        read_only_fields = ['id', 'username', 'role', 'school', 'is_active', 'must_change_password']
 
     def get_full_name(self, obj):
         name = f"{obj.first_name} {obj.last_name}".strip()
         return name or obj.username
+
+    def validate_email(self, value):
+        # Email OTP signs in the account that owns the address, so two
+        # accounts must never share one.
+        email = (value or '').strip().lower()
+        if email and User.objects.filter(email__iexact=email).exclude(pk=getattr(self.instance, 'pk', None)).exists():
+            raise serializers.ValidationError("Another account already uses this email address.")
+        return email
+
+    def validate_phone_number(self, value):
+        phone = normalize_phone_number(value or '')
+        if not phone:
+            return phone
+        role = getattr(self.instance, 'role', None)
+        clash = User.objects.filter(phone_number=phone, role=role).exclude(pk=getattr(self.instance, 'pk', None))
+        if clash.exists():
+            raise serializers.ValidationError("Another account already uses this mobile number.")
+        return phone
 
     def get_profile_picture_url(self, obj):
         if not obj.profile_picture:
@@ -132,6 +156,8 @@ class LoginSerializer(serializers.Serializer):
         user = authenticate(username=username, password=password)
         if not user:
             raise serializers.ValidationError("Invalid username or password.")
+        if temporary_password_expired(user):
+            raise serializers.ValidationError(TEMPORARY_EXPIRED_MESSAGE)
 
         if not user.is_active:
             raise serializers.ValidationError("User account is disabled.")
@@ -417,7 +443,6 @@ class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField(required=False, allow_blank=True, default='')
     phone_number = serializers.CharField(required=False, allow_blank=True, default='')
     role = serializers.CharField(required=False, default='PARENT')
-    school_id = serializers.IntegerField(required=False, allow_null=True)
 
     def validate_role(self, value):
         # Staff accounts come from the school admin, never from a public
@@ -455,13 +480,9 @@ class RegisterSerializer(serializers.Serializer):
         phone_number = validated_data.get('phone_number', '')
         password = validated_data['password']
         role = validated_data.get('role', User.Role.PARENT)
-        school_id = validated_data.get('school_id')
-
-        school = None
-        if school_id:
-            school = School.objects.filter(id=school_id).first()
-        if not school:
-            school = get_default_school()
+        # A public sign-up always joins this deployment's school; the client
+        # does not get to pick one.
+        school = get_default_school()
 
         # Generate clean, unique username
         if email:
@@ -493,3 +514,40 @@ class RegisterSerializer(serializers.Serializer):
             is_active=True,
         )
         return user
+
+
+TEMPORARY_EXPIRED_MESSAGE = (
+    "Your temporary password has expired. Ask the school office to reset it."
+)
+
+
+class SchoolTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Password sign-in used by the app. Refuses an expired temporary password
+    before any token is issued, and tells the app when the user must choose
+    a new password.
+    """
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        if temporary_password_expired(self.user):
+            raise AuthenticationFailed(TEMPORARY_EXPIRED_MESSAGE, code='temporary_password_expired')
+        data['must_change_password'] = bool(self.user.must_change_password)
+        return data
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8, max_length=128)
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        if not user.check_password(attrs['current_password']):
+            raise serializers.ValidationError({'current_password': 'The current password is not correct.'})
+        if attrs['current_password'] == attrs['new_password']:
+            raise serializers.ValidationError({'new_password': 'Choose a password different from the current one.'})
+        try:
+            validate_password(attrs['new_password'], user=user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({'new_password': list(exc.messages)})
+        return attrs

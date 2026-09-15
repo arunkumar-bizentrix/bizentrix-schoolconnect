@@ -1,19 +1,25 @@
 from django.db import transaction
+from django.http import HttpResponse
+from django.utils.text import slugify
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.schools.services import attach_user_to_school, get_school_for
+from apps.students.access import student_for_report
 from apps.students.models import Class, Student
 from apps.timetable.models import Subject
 
-from .models import Exam, ExamPaper, Mark
+from .grading import DEFAULT_GRADE_BANDS, bands_for_school, validate_bands
+from .models import Exam, ExamPaper, GradeBand, Mark
+from .pdf import render_report_card_pdf
 from .serializers import (
     ExamPaperSerializer,
+    GradeBandSerializer,
     ExamSerializer,
     MarkSheetSubmitSerializer,
 )
@@ -161,7 +167,7 @@ class ExamViewSet(viewsets.ModelViewSet):
         subject_ids = request.data.get('subject_ids') or []
         try:
             max_marks = int(request.data.get('max_marks', 100))
-            pass_marks = int(request.data.get('pass_marks', 35))
+            pass_marks = int(request.data.get('pass_marks', 33))
         except (TypeError, ValueError):
             raise ValidationError('Maximum and pass marks must be whole numbers.')
         if max_marks <= 0 or pass_marks > max_marks or pass_marks < 0:
@@ -391,38 +397,15 @@ class ExamPaperViewSet(viewsets.GenericViewSet):
 class ReportCardView(APIView):
     """
     GET /api/v1/report-card/?student_id=
-    A student's marksheet for every exam: subject marks, total, percentage,
-    result and rank. Parents see only published exams, only for their own
-    children; teachers see students of the classes they teach.
+    A student's marksheet for every exam: subject marks and grades, total,
+    percentage, result and rank. Parents see only published exams, only for
+    their own children; teachers see students of the classes they teach.
     """
 
     permission_classes = [permissions.IsAuthenticated, IsSchoolMember]
 
     def get(self, request):
-        user = request.user
-        student_id = request.query_params.get('student_id')
-        if not student_id:
-            raise ValidationError({'student_id': 'Choose a student.'})
-
-        students = Student.objects.select_related('class_enrolled')
-        if not (user.is_superuser and not user.school):
-            students = students.filter(school=get_school_for(user))
-        student = students.filter(id=student_id).first()
-        if student is None:
-            return Response({'detail': 'Student not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        if user.role == 'PARENT':
-            if not student.parents.filter(id=user.id).exists():
-                raise PermissionDenied('You can only see your own children.')
-        elif user.role == 'TEACHER':
-            teaches = Class.objects.filter(teachers=user).filter(
-                Q(id=student.class_enrolled_id) | Q(exam_papers__marks__student=student)
-            ).exists()
-            if not teaches:
-                raise PermissionDenied('You can only see students of classes you teach.')
-        elif not _is_admin(user):
-            raise PermissionDenied()
-
+        student = student_for_report(request, request.query_params.get('student_id'))
         return Response({
             'student': student.id,
             'student_name': student.full_name,
@@ -431,5 +414,89 @@ class ReportCardView(APIView):
                 f'{student.class_enrolled.name} - {student.class_enrolled.section}'
                 if student.class_enrolled else None
             ),
-            'exams': report_card(student, published_only=user.role == 'PARENT'),
+            'exams': report_card(student, published_only=request.user.role == 'PARENT'),
         })
+
+
+class ReportCardPdfView(APIView):
+    """
+    GET /api/v1/report-card/pdf/?student_id=&exam_id=
+    The printable report card. With exam_id, that exam only; without, every
+    exam the caller may see (one page each). Same access rules as the JSON
+    report card - a parent gets published results for their own child only.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsSchoolMember]
+
+    def get(self, request):
+        student = student_for_report(request, request.query_params.get('student_id'))
+        cards = report_card(student, published_only=request.user.role == 'PARENT')
+
+        exam_id = request.query_params.get('exam_id')
+        if exam_id:
+            cards = [card for card in cards if str(card['exam']) == str(exam_id)]
+            if not cards:
+                # Unpublished for a parent, or not this student's exam: the
+                # same answer either way, so nothing leaks about which.
+                raise NotFound('No results for that exam.')
+
+        pdf = render_report_card_pdf(school=student.school, student=student, cards=cards)
+        name_part = cards[0]['exam_name'] if len(cards) == 1 else 'all-exams'
+        filename = slugify(f'report-card-{student.admission_number}-{name_part}') + '.pdf'
+
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
+        response['Cache-Control'] = 'private, no-store'
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response
+
+
+class GradeScaleView(APIView):
+    """
+    GET /api/v1/grade-scale/   the school's grading scale (any signed-in member)
+    PUT /api/v1/grade-scale/   admin: replace the whole scale at once
+
+    The scale is replaced as a unit rather than edited row by row, so it is
+    never half-changed: every save is checked for duplicates and for a band
+    starting at 0% before anything is written.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsSchoolMember]
+
+    def _payload(self, school):
+        is_default = not GradeBand.objects.filter(school=school).exists()
+        return {
+            'is_default': is_default,
+            'bands': [
+                {'label': label, 'min_percentage': float(minimum), 'description': description}
+                for label, minimum, description in bands_for_school(school)
+            ],
+        }
+
+    def get(self, request):
+        return Response(self._payload(get_school_for(request.user)))
+
+    def put(self, request):
+        if not _is_admin(request.user):
+            raise PermissionDenied('Only school administrators can change the grading scale.')
+
+        serializer = GradeBandSerializer(data=request.data.get('bands', []), many=True)
+        serializer.is_valid(raise_exception=True)
+        bands = serializer.validated_data
+        problems = validate_bands(bands)
+        if problems:
+            return Response({'detail': ' '.join(problems), 'problems': problems}, status=status.HTTP_400_BAD_REQUEST)
+
+        school = attach_user_to_school(request.user)
+        with transaction.atomic():
+            GradeBand.objects.filter(school=school).delete()
+            GradeBand.objects.bulk_create([
+                GradeBand(
+                    school=school,
+                    label=band['label'].strip(),
+                    min_percentage=band['min_percentage'],
+                    description=band.get('description', '').strip(),
+                )
+                for band in bands
+            ])
+        return Response(self._payload(school))

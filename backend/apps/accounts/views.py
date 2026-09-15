@@ -18,10 +18,14 @@ from .services import (
     WhatsAppService,
     create_school_account,
     reset_temporary_password,
+    revoke_sessions,
+    sms,
 )
 from .services.accounts import MANAGED_ROLES, normalize_phone, split_name
 from .serializers import (
     LoginSerializer,
+    ChangePasswordSerializer,
+    SchoolTokenObtainPairSerializer,
     StaffCreateSerializer,
     StaffSummarySerializer,
     StaffUpdateSerializer,
@@ -40,8 +44,10 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
     """
     POST /api/v1/auth/token/
     SimpleJWT's credential endpoint, rate limited per client IP. This is the
-    endpoint the mobile app uses for password sign-in.
+    endpoint the mobile app uses for password sign-in. Refuses an expired
+    temporary password and reports `must_change_password`.
     """
+    serializer_class = SchoolTokenObtainPairSerializer
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'auth'
 
@@ -233,6 +239,27 @@ class VerifyOTPView(APIView):
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
 
+def _deliver_temporary_password(user, temporary_password):
+    """
+    Sends the temporary password by SMS when SMS is set up, and only then
+    keeps it out of the response. Without SMS the admin sees it once, clearly
+    marked as not sent, so they can hand it over themselves.
+    """
+    result = sms.send_temporary_password(
+        user, temporary_password, school_name=user.school.name if user.school_id else '',
+    )
+    payload = {
+        'delivery': 'sms' if result.sent else 'shown_to_admin',
+        'sms_status': result.status,
+        'sms_detail': result.detail,
+        'expires_at': user.temporary_password_expires_at,
+    }
+    if not result.sent:
+        payload['temporary_password'] = temporary_password
+    logger.info("Temporary password for account %s: delivery=%s", user.pk, payload['delivery'])
+    return payload
+
+
 def _is_school_admin(user):
     return user.is_authenticated and (user.role == User.Role.ADMIN or user.is_superuser)
 
@@ -340,10 +367,7 @@ class SchoolStaffListView(APIView):
 
         logger.info("Admin %s created %s account %s", request.user.pk, user.role, user.pk)
         return Response(
-            {
-                'account': StaffSummarySerializer(user).data,
-                'temporary_password': temporary_password,
-            },
+            {'account': StaffSummarySerializer(user).data, **_deliver_temporary_password(user, temporary_password)},
             status=status.HTTP_201_CREATED,
         )
 
@@ -404,8 +428,10 @@ class SchoolStaffDetailView(APIView):
 
         person.save()
         if 'is_active' in data and not person.is_active:
-            # A deactivated account must stop receiving pushes at once.
+            # A deactivated account must stop receiving pushes at once, and
+            # no device may refresh its way back in.
             DeviceToken.objects.filter(user=person).delete()
+            revoke_sessions(person)
 
         person = _with_linked(User.objects, person.role).get(pk=person.pk)
         return Response(StaffSummarySerializer(person).data)
@@ -429,7 +455,40 @@ class StaffResetPasswordView(APIView):
 
         temporary_password = reset_temporary_password(person)
         logger.info("Admin %s reset the password of account %s", request.user.pk, person.pk)
-        return Response({'temporary_password': temporary_password})
+        return Response(_deliver_temporary_password(person, temporary_password))
+
+
+class ChangePasswordView(APIView):
+    """
+    POST /api/v1/auth/change-password/   {current_password, new_password}
+
+    Replaces a temporary password (or any password) with one the user chose.
+    Every other session is signed out; the caller gets fresh tokens so this
+    device stays signed in.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        user.set_password(serializer.validated_data['new_password'])
+        user.must_change_password = False
+        user.temporary_password_expires_at = None
+        user.save(update_fields=['password', 'must_change_password', 'temporary_password_expires_at'])
+        revoke_sessions(user)
+
+        refresh = RefreshToken.for_user(user)
+        logger.info("User %s changed their password", user.pk)
+        return Response({
+            'detail': 'Password changed.',
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': UserSerializer(user, context={'request': request}).data,
+        })
 
 
 class RegisterView(APIView):

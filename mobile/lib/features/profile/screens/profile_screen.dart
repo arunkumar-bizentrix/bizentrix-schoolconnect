@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../auth/screens/change_password_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../core/constants/app_colors.dart';
@@ -271,7 +272,27 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+              ),
+              icon: const Icon(Icons.lock_reset_rounded, size: 18),
+              label: const Text('Change password', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.border),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
 
           // Logout Action Button
           SizedBox(

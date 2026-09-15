@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../classes/providers/class_options_provider.dart';
 import '../../timetable/providers/timetable_editor_provider.dart';
 import '../providers/exams_provider.dart';
 import 'exam_detail_screen.dart';
@@ -25,7 +26,11 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _maxMarks = TextEditingController(text: '100');
-  final _passMarks = TextEditingController(text: '35');
+  final _passMarks = TextEditingController(text: '33');
+
+  /// The pass mark follows 33% of the maximum (grade D is a pass) until the
+  /// admin types their own.
+  bool _passEdited = false;
   String _academicYear = AppConstants.currentAcademicYear;
   DateTime? _startDate;
   DateTime? _endDate;
@@ -127,7 +132,7 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final classesAsync = ref.watch(allClassesProvider(_academicYear));
+    final classesAsync = ref.watch(classOptionsProvider(_academicYear));
     final subjectsAsync = ref.watch(subjectsProvider);
     final paperCount = _classIds.length * _subjectIds.length;
 
@@ -321,6 +326,11 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: _decoration(label: 'Maximum'),
+                    onChanged: (value) {
+                      final max = int.tryParse(value);
+                      if (_passEdited || max == null) return;
+                      _passMarks.text = '${(max * 33 / 100).ceil()}';
+                    },
                     validator: (value) {
                       final max = int.tryParse(value ?? '');
                       return (max == null || max <= 0 || max > 999) ? 'Enter 1-999' : null;
@@ -334,6 +344,7 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: _decoration(label: 'Pass'),
+                    onChanged: (_) => _passEdited = true,
                     validator: (value) {
                       final pass = int.tryParse(value ?? '');
                       final max = int.tryParse(_maxMarks.text) ?? 0;

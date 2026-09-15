@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../classes/models/class_model.dart';
-import '../../classes/providers/classes_provider.dart';
+import '../../classes/providers/class_options_provider.dart';
 import '../models/attendance_model.dart';
 import '../providers/attendance_provider.dart';
 
@@ -95,7 +95,7 @@ class _MarkAttendanceScreenState extends ConsumerState<MarkAttendanceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final classesAsync = ref.watch(classesProvider);
+    final classesAsync = ref.watch(currentClassOptionsProvider);
     final classes = classesAsync.value ?? const <ClassModel>[];
 
     // Default to the class the caller asked for, else the teacher's first.

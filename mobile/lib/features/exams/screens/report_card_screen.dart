@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/files/protected_file.dart';
+import '../../../core/network/api_endpoints.dart';
 import '../../../shared/widgets/list_state_views.dart';
 import '../models/exam_models.dart';
 import '../providers/exams_provider.dart';
+import '../widgets/grade_badge.dart';
 import 'exams_screen.dart';
 
 /// A student's marksheet across exams, newest first.
@@ -26,6 +29,18 @@ class ReportCardScreen extends ConsumerWidget {
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
         title: const Text('Report card', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: AppColors.textPrimary)),
+        actions: [
+          if (cardAsync.value?.exams.isNotEmpty ?? false)
+            IconButton(
+              tooltip: 'Download report card (PDF)',
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              onPressed: () => openProtectedFile(
+                context,
+                url: ApiEndpoints.reportCardPdf(studentId),
+                fileName: 'report-card-${cardAsync.value!.admissionNumber}.pdf',
+              ),
+            ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(reportCardProvider(studentId)),
@@ -57,7 +72,14 @@ class ReportCardScreen extends ConsumerWidget {
               for (final exam in card.exams)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: ReportCardExamCard(exam: exam),
+                  child: ReportCardExamCard(
+                    exam: exam,
+                    onDownload: () => openProtectedFile(
+                      context,
+                      url: ApiEndpoints.reportCardPdf(studentId, examId: exam.examId),
+                      fileName: 'report-card-${card.admissionNumber}-${exam.examName}.pdf',
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -68,9 +90,12 @@ class ReportCardScreen extends ConsumerWidget {
 }
 
 class ReportCardExamCard extends StatelessWidget {
-  const ReportCardExamCard({super.key, required this.exam});
+  const ReportCardExamCard({super.key, required this.exam, this.onDownload});
 
   final ReportCardExam exam;
+
+  /// Opens this exam's printable marksheet; hidden when null.
+  final VoidCallback? onDownload;
 
   @override
   Widget build(BuildContext context) {
@@ -118,15 +143,26 @@ class ReportCardExamCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '${formatMarks(exam.percentage)}%',
-                            style: const TextStyle(
-                              fontSize: 34,
-                              height: 1,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              fontFeatures: [FontFeature.tabularFigures()],
-                            ),
+                          // Wrap, not Row: on a narrow phone the grade drops under
+                          // the percentage instead of pushing past the edge.
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 10,
+                            runSpacing: 6,
+                            children: [
+                              Text(
+                                '${formatMarks(exam.percentage)}%',
+                                style: const TextStyle(
+                                  fontSize: 34,
+                                  height: 1,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  fontFeatures: [FontFeature.tabularFigures()],
+                                ),
+                              ),
+                              if (exam.grade != null)
+                                GradeBadge(grade: exam.grade, onDark: true, large: true),
+                            ],
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -164,6 +200,18 @@ class ReportCardExamCard extends StatelessWidget {
               ],
             ),
           ),
+          if (onDownload != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onDownload,
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: const Text('Printable marksheet (PDF)'),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -197,6 +245,10 @@ class _SubjectLine extends StatelessWidget {
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                 ),
               ),
+              if (subject.grade != null) ...[
+                GradeBadge(grade: subject.grade),
+                const SizedBox(width: 8),
+              ],
               Text(
                 subject.isAbsent ? 'Absent' : '${subject.display} / ${subject.maxMarks}',
                 style: TextStyle(

@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'apps.attendance',
     'apps.timetable',
     'apps.exams',
+    'apps.messaging',
 ]
 
 MIDDLEWARE = [
@@ -151,7 +152,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Django REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.accounts.authentication.SchoolJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -167,6 +168,8 @@ REST_FRAMEWORK = {
         # in the serializers; this is the additional per-IP ceiling.
         'auth': os.getenv('THROTTLE_RATE_AUTH', '10/min'),
         'otp': os.getenv('THROTTLE_RATE_OTP', '20/hour'),
+        # Sending messages: generous for a real conversation, stops a script.
+        'messages': os.getenv('THROTTLE_RATE_MESSAGES', '30/min'),
     },
 }
 
@@ -203,6 +206,24 @@ WHATSAPP_OTP_TEMPLATE = os.getenv('WHATSAPP_OTP_TEMPLATE', 'hello_world')
 # Point this at the service-account JSON downloaded from
 # Firebase Console > Project settings > Service accounts. Until the file
 # exists, push delivery is a logged no-op and the rest of the app is unaffected.
+# Temporary passwords issued by the school office stop working after this many
+# days if the user has not signed in and replaced them.
+TEMPORARY_PASSWORD_DAYS = int(os.getenv('TEMPORARY_PASSWORD_DAYS', '7'))
+
+# SMS (apps/accounts/services/sms). Empty SMS_PROVIDER = SMS off: the admin is
+# shown a temporary password once instead. Credentials come only from the
+# environment and are never logged.
+SMS_PROVIDER = os.getenv('SMS_PROVIDER', '')
+SMS_API_KEY = os.getenv('SMS_API_KEY', '')
+SMS_SENDER_ID = os.getenv('SMS_SENDER_ID', '')
+SMS_DLT_ENTITY_ID = os.getenv('SMS_DLT_ENTITY_ID', '')
+SMS_DLT_TEMPLATE_ID = os.getenv('SMS_DLT_TEMPLATE_ID', '')
+
+# Push is sent from a background thread after the database commit, so a
+# school-wide notice to a thousand parents does not hold the admin's request
+# open for a minute. Tests turn this off to assert on delivery directly.
+PUSH_IN_BACKGROUND = os.getenv('PUSH_IN_BACKGROUND', 'true').lower() in ('1', 'true', 'yes')
+
 FIREBASE_SERVICE_ACCOUNT_FILE = os.getenv(
     'FIREBASE_SERVICE_ACCOUNT_FILE', 'firebase-service-account.json'
 )

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/files/protected_file.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../models/announcement_model.dart';
 
@@ -142,7 +142,7 @@ class AnnouncementDetailScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
-                        _isImage(announcement.attachmentUrl!)
+                        _isImage(announcement.attachmentName ?? '')
                             ? Icons.image_outlined
                             : Icons.picture_as_pdf,
                         color: AppColors.mathIconColor,
@@ -155,7 +155,7 @@ class AnnouncementDetailScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _fileName(announcement.attachmentUrl!),
+                            announcement.attachmentName ?? 'Attachment',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -166,24 +166,20 @@ class AnnouncementDetailScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           const Text(
-                            'Tap to copy the link',
+                            'Tap to open',
                             style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                           ),
                         ],
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Copy attachment link',
-                      icon: const Icon(Icons.link_rounded, color: AppColors.primary),
-                      onPressed: () async {
-                        await Clipboard.setData(
-                          ClipboardData(text: announcement.attachmentUrl!),
-                        );
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Attachment link copied')),
-                        );
-                      },
+                      tooltip: 'Open attachment',
+                      icon: const Icon(Icons.open_in_new_rounded, color: AppColors.primary),
+                      onPressed: () => openProtectedFile(
+                        context,
+                        url: announcement.attachmentUrl!,
+                        fileName: announcement.attachmentName ?? 'attachment',
+                      ),
                     ),
                   ],
                 ),
@@ -218,13 +214,6 @@ class AnnouncementDetailScreen extends StatelessWidget {
       ),
     );
   }
-  /// Last path segment of an attachment URL, used as its display name.
-  static String _fileName(String url) {
-    final clean = url.split('?').first;
-    final parts = clean.split('/');
-    return parts.isEmpty || parts.last.isEmpty ? 'Attachment' : parts.last;
-  }
-
   static bool _isImage(String url) {
     final lower = url.toLowerCase().split('?').first;
     return lower.endsWith('.jpg') ||
