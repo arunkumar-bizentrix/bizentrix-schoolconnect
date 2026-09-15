@@ -113,6 +113,19 @@ class HomeworkAPITests(APITestCase):
         self.assertEqual(homework.assigned_by, self.teacher_a)
         self.assertEqual(homework.school, self.school_a)
 
+    def test_admin_can_monitor_but_cannot_create_homework(self):
+        self.client.force_authenticate(user=self.admin_a)
+        self.assertEqual(self.client.get('/api/v1/homework/').status_code, status.HTTP_200_OK)
+        response = self.client.post('/api/v1/homework/', {
+            'classroom': self.class_a1.id,
+            'subject': 'Mathematics',
+            'title': 'Admin homework',
+            'description': 'Must be rejected.',
+            'assigned_date': str(date.today()),
+            'due_date': str(date.today() + timedelta(days=1)),
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_teacher_cannot_create_homework_for_unassigned_class(self):
         self.client.force_authenticate(user=self.teacher_a)
         today = date.today()

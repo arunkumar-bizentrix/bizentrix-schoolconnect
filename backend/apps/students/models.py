@@ -102,13 +102,11 @@ class Class(models.Model):
         """
         Attendance is taken once a day, so one person owns it.
 
-        Admins always may. When a class teacher is set, only they may -
+        Admins monitor but do not mark. When a class teacher is set, only they may -
         otherwise five subject teachers could each mark the same morning
         differently. Classes without one fall back to any assigned teacher,
         so nothing that worked before the class teacher existed stops working.
         """
-        if user.is_superuser or user.role == 'ADMIN':
-            return True
         if user.role != 'TEACHER':
             return False
         if self.class_teacher_id:

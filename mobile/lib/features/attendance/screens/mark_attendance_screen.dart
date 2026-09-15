@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/role_access.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../classes/models/class_model.dart';
 import '../../classes/providers/class_options_provider.dart';
 import '../models/attendance_model.dart';
@@ -95,6 +97,22 @@ class _MarkAttendanceScreenState extends ConsumerState<MarkAttendanceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isTeacher = ref.watch(authProvider).user?.role.isTeacher ?? false;
+    if (!isTeacher) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Attendance')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Attendance is read-only for this account. Only teachers can mark or update it.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     final classesAsync = ref.watch(currentClassOptionsProvider);
     final classes = classesAsync.value ?? const <ClassModel>[];
 
@@ -245,6 +263,8 @@ class _MarkAttendanceScreenState extends ConsumerState<MarkAttendanceScreen> {
                   initialDate: _date,
                   firstDate: DateTime.now().subtract(const Duration(days: 180)),
                   lastDate: DateTime.now(),
+                  initialEntryMode: DatePickerEntryMode.inputOnly,
+                  helpText: 'Enter attendance date',
                 );
                 if (picked != null) {
                   setState(() {

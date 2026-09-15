@@ -196,8 +196,9 @@ class StudentClassEnrollmentSerializer(serializers.ModelSerializer):
 class StudentSerializer(serializers.ModelSerializer):
     school_name = serializers.CharField(source='school.name', read_only=True)
     full_name = serializers.CharField(read_only=True)
-    class_name = serializers.CharField(source='class_enrolled.__str__', read_only=True)
+    class_name = serializers.SerializerMethodField()
     academic_year = serializers.SerializerMethodField()
+    parent_names = serializers.SerializerMethodField()
     is_active = serializers.BooleanField(default=True, required=False)
 
     class Meta:
@@ -215,6 +216,7 @@ class StudentSerializer(serializers.ModelSerializer):
             'class_name',
             'academic_year',
             'parents',
+            'parent_names',
             'is_active',
             'created_at',
             'updated_at',
@@ -225,6 +227,33 @@ class StudentSerializer(serializers.ModelSerializer):
         if obj.class_enrolled:
             return obj.class_enrolled.academic_year
         return None
+
+    def get_class_name(self, obj):
+        return str(obj.class_enrolled) if obj.class_enrolled else 'Unassigned'
+
+    def get_parent_names(self, obj):
+        return [
+            f"{parent.first_name} {parent.last_name}".strip() or parent.username
+            for parent in obj.parents.all()
+        ]
+
+    def validate_admission_number(self, value):
+        admission_number = value.strip()
+        request = self.context.get('request')
+        school_id = get_school_id_for(request.user) if request else None
+        queryset = Student.objects.filter(
+            school_id=school_id,
+            admission_number__iexact=admission_number,
+        )
+        if self.instance is not None:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        existing = queryset.select_related('class_enrolled').first() if school_id else None
+        if existing is not None:
+            class_name = str(existing.class_enrolled) if existing.class_enrolled else 'no current class'
+            raise serializers.ValidationError(
+                f'This admission number already belongs to {existing.full_name} ({class_name}).'
+            )
+        return admission_number
 
     def validate_class_enrolled(self, value):
         if value:

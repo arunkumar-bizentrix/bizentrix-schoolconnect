@@ -328,8 +328,8 @@ class WorkflowIntegrationTests(APITestCase):
         res = self.client.post('/api/v1/homework/', payload, format='json')
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-    # 13. Teacher can create class announcement for assigned class
-    def test_13_teacher_can_create_class_announcement_for_assigned_class(self):
+    # 13. Announcements are published only by the school office
+    def test_13_teacher_cannot_create_class_announcement(self):
         self.client.force_authenticate(user=self.teacher_priya)
         payload = {
             'audience_type': 'CLASS',
@@ -339,7 +339,7 @@ class WorkflowIntegrationTests(APITestCase):
             'priority': 'IMPORTANT',
         }
         res = self.client.post('/api/v1/announcements/', payload, format='json')
-        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     # 14. Teacher cannot target unassigned class
     def test_14_teacher_cannot_target_unassigned_class(self):
@@ -382,7 +382,7 @@ class WorkflowIntegrationTests(APITestCase):
 
     # 16. Announcement creation creates parent notifications
     def test_16_announcement_creation_creates_parent_notifications(self):
-        self.client.force_authenticate(user=self.teacher_priya)
+        self.client.force_authenticate(user=self.admin_user)
         payload = {
             'audience_type': 'CLASS',
             'target_class': self.class_5a.id,
@@ -398,6 +398,16 @@ class WorkflowIntegrationTests(APITestCase):
             announcement_id=res.data['id'],
         )
         self.assertTrue(kumar_notifs.exists())
+        teacher_notifs = Notification.objects.filter(
+            recipient=self.teacher_priya,
+            notification_type=Notification.NotificationType.ANNOUNCEMENT,
+            announcement_id=res.data['id'],
+        )
+        self.assertTrue(teacher_notifs.exists())
+        self.assertFalse(Notification.objects.filter(
+            recipient=self.teacher_anand,
+            announcement_id=res.data['id'],
+        ).exists())
 
     # 17. Multiple children supported across different classes
     def test_17_multiple_children_supported_across_different_classes(self):

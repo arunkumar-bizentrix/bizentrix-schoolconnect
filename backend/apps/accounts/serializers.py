@@ -1,4 +1,3 @@
-import re
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import AuthenticationFailed
@@ -10,7 +9,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from apps.schools.models import School
 from .services.accounts import temporary_password_expired
-from apps.schools.services import attach_user_to_school, get_default_school, get_school_id_for
+from apps.schools.services import attach_user_to_school, get_school_id_for
 
 from .models import User, OTPVerification
 
@@ -431,89 +430,6 @@ class VerifyEmailOTPSerializer(serializers.Serializer):
             'refresh': str(refresh),
             'user': UserSerializer(user).data,
         }
-
-
-class RegisterSerializer(serializers.Serializer):
-    """
-    Serializer for public parent registration.
-    Associates the new user with Vivekananda School Bagalur by default.
-    """
-    full_name = serializers.CharField(required=True, min_length=2, max_length=150)
-    password = serializers.CharField(required=True, min_length=8, write_only=True)
-    email = serializers.EmailField(required=False, allow_blank=True, default='')
-    phone_number = serializers.CharField(required=False, allow_blank=True, default='')
-    role = serializers.CharField(required=False, default='PARENT')
-
-    def validate_role(self, value):
-        # Staff accounts come from the school admin, never from a public
-        # sign-up form: anyone can install the app, and a self-made teacher
-        # account would be one class assignment away from seeing children's
-        # records.
-        normalized = str(value).upper().strip()
-        if normalized in (User.Role.TEACHER, User.Role.ADMIN):
-            raise serializers.ValidationError(
-                "Teacher accounts are created by the school admin. "
-                "Please ask the school office for your login."
-            )
-        return User.Role.PARENT
-
-    def validate_email(self, value):
-        if value:
-            normalized = value.strip().lower()
-            if User.objects.filter(email__iexact=normalized).exists():
-                raise serializers.ValidationError("An account with this email address already exists. Please sign in instead.")
-            return normalized
-        return ''
-
-    def validate_phone_number(self, value):
-        if value:
-            return normalize_phone_number(value)
-        return ''
-
-    def create(self, validated_data):
-        full_name = validated_data['full_name'].strip()
-        parts = full_name.split(' ', 1)
-        first_name = parts[0]
-        last_name = parts[1] if len(parts) > 1 else ''
-
-        email = validated_data.get('email', '').strip().lower()
-        phone_number = validated_data.get('phone_number', '')
-        password = validated_data['password']
-        role = validated_data.get('role', User.Role.PARENT)
-        # A public sign-up always joins this deployment's school; the client
-        # does not get to pick one.
-        school = get_default_school()
-
-        # Generate clean, unique username
-        if email:
-            base_username = email.split('@')[0]
-        elif phone_number:
-            base_username = f"user_{phone_number}"
-        else:
-            base_username = full_name.lower()
-
-        base_username = re.sub(r'[^a-zA-Z0-9_]', '', base_username.replace(' ', '_'))
-        if not base_username:
-            base_username = "user"
-
-        username = base_username
-        counter = 1
-        while User.objects.filter(username=username).exists():
-            username = f"{base_username}_{counter}"
-            counter += 1
-
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password,
-            first_name=first_name,
-            last_name=last_name,
-            role=role,
-            phone_number=phone_number,
-            school=school,
-            is_active=True,
-        )
-        return user
 
 
 TEMPORARY_EXPIRED_MESSAGE = (

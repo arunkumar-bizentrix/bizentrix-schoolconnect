@@ -149,16 +149,18 @@ class NotificationTargetingTests(APITestCase):
     # -- 4: class announcement ---------------------------------------------------------------
 
     def test_4_class_announcement_reaches_that_class_families_only(self):
-        self.announce(self.priya, audience_type='CLASS', target_class=self.class_5a.id)
+        self.announce(self.admin, audience_type='CLASS', target_class=self.class_5a.id)
 
         for parent in (self.meena, self.suresh, self.lakshmi, self.ravi):
             self.assertEqual(self.notes(parent, 'ANNOUNCEMENT').count(), 1, parent.username)
         self.assertFalse(self.notes(self.vikram).exists())
-        self.assertFalse(self.notes(self.priya).exists(), 'the author is not notified')
+        self.assertEqual(self.notes(self.priya, 'ANNOUNCEMENT').count(), 1)
 
     def test_6b_announcement_does_not_reach_5a_only_families(self):
-        self.announce(self.vikram, audience_type='CLASS', target_class=self.class_6b.id)
+        self.announce(self.admin, audience_type='CLASS', target_class=self.class_6b.id)
         self.assertEqual(self.notes(self.ravi, 'ANNOUNCEMENT').count(), 1)
+        self.assertEqual(self.notes(self.vikram, 'ANNOUNCEMENT').count(), 1)
+        self.assertFalse(self.notes(self.priya).exists())
         for parent in (self.meena, self.suresh, self.lakshmi):
             self.assertFalse(self.notes(parent).exists(), parent.username)
 
@@ -206,7 +208,7 @@ class NotificationTargetingTests(APITestCase):
 
     def test_7_two_children_same_class_one_notice_per_class_event(self):
         self.homework(self.priya, self.class_5a)
-        self.announce(self.priya, audience_type='CLASS', target_class=self.class_5a.id)
+        self.announce(self.admin, audience_type='CLASS', target_class=self.class_5a.id)
 
         self.assertEqual(self.notes(self.lakshmi, 'HOMEWORK').count(), 1)
         self.assertEqual(self.notes(self.lakshmi, 'ANNOUNCEMENT').count(), 1)

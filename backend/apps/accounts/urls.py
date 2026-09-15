@@ -7,7 +7,6 @@ from .views import (
     VerifyOTPView,
     SendEmailOTPView,
     VerifyEmailOTPView,
-    RegisterView,
     SchoolStaffDetailView,
     SchoolStaffListView,
     StaffResetPasswordView,
@@ -15,7 +14,6 @@ from .views import (
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='auth_login'),
-    path('register/', RegisterView.as_view(), name='auth_register'),
     path('me/', UserProfileView.as_view(), name='auth_me'),
     path('change-password/', ChangePasswordView.as_view(), name='auth_change_password'),
 

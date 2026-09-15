@@ -34,7 +34,6 @@ from .serializers import (
     VerifyOTPSerializer,
     SendEmailOTPSerializer,
     VerifyEmailOTPSerializer,
-    RegisterSerializer,
 )
 
 logger = logging.getLogger('schoolconnect.accounts')
@@ -490,38 +489,3 @@ class ChangePasswordView(APIView):
             'user': UserSerializer(user, context={'request': request}).data,
         })
 
-
-class RegisterView(APIView):
-    """
-    POST /api/v1/auth/register/
-    Registers a new parent or teacher, associates them with Vivekananda School Bagalur,
-    dispatches a branded welcome email via real SMTP, and returns JWT auth tokens.
-    """
-    permission_classes = [permissions.AllowAny]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = 'auth'
-
-    def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-
-        # Dispatch welcome email if recipient email provided
-        if user.email:
-            full_name = f"{user.first_name} {user.last_name}".strip() or user.username
-            EmailService.send_welcome_email(
-                recipient_email=user.email,
-                full_name=full_name,
-                role=user.role,
-            )
-
-        refresh = RefreshToken.for_user(user)
-
-        return Response({
-            'success': True,
-            'status': 'success',
-            'message': f"Account registered successfully for {user.first_name or user.username}!",
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
-            'user': UserSerializer(user, context={'request': request}).data,
-        }, status=status.HTTP_201_CREATED)

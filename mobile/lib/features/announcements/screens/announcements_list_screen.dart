@@ -26,9 +26,10 @@ class _AnnouncementsListScreenState extends ConsumerState<AnnouncementsListScree
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final announcementsAsync = ref.watch(announcementsProvider);
     final user = ref.watch(authProvider).user;
-    final isParent = user?.role.isParent ?? false;
+    final canManage = user?.role.canManageAnnouncements ?? false;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
@@ -41,9 +42,8 @@ class _AnnouncementsListScreenState extends ConsumerState<AnnouncementsListScree
           ScreenHeader(
             title: 'Announcements',
             subtitle: 'School circulars and notices',
-            action: isParent
-                ? null
-                : ElevatedButton.icon(
+            action: canManage
+                ? ElevatedButton.icon(
                     onPressed: () => _showAddAnnouncementDialog(context),
                     icon: const Icon(Icons.add, size: 16),
                     label: const Text('New Notice', style: TextStyle(fontSize: 12)),
@@ -54,7 +54,8 @@ class _AnnouncementsListScreenState extends ConsumerState<AnnouncementsListScree
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       elevation: 0,
                     ),
-                  ),
+                  )
+                : null,
           ),
           const SizedBox(height: 16),
 
@@ -69,14 +70,14 @@ class _AnnouncementsListScreenState extends ConsumerState<AnnouncementsListScree
                   selected: isSelected,
                   onSelected: (_) => setState(() => _selectedFilter = filter),
                   selectedColor: AppColors.primary,
-                  backgroundColor: Colors.white,
+                  backgroundColor: colors.surface,
                   labelStyle: TextStyle(
                     color: isSelected ? Colors.white : AppColors.textSecondary,
                     fontSize: 12,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                   ),
                   side: BorderSide(
-                    color: isSelected ? AppColors.primary : AppColors.border,
+                    color: isSelected ? AppColors.primary : colors.outlineVariant,
                   ),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   showCheckmark: false,
@@ -120,7 +121,7 @@ class _AnnouncementsListScreenState extends ConsumerState<AnnouncementsListScree
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final notice = filtered[index];
-                  return _buildAnnouncementCard(context, notice, isParent);
+                  return _buildAnnouncementCard(context, notice, canManage);
                 },
               );
             },
@@ -176,7 +177,8 @@ class _AnnouncementsListScreenState extends ConsumerState<AnnouncementsListScree
     );
   }
 
-  Widget _buildAnnouncementCard(BuildContext context, AnnouncementModel notice, bool isParent) {
+  Widget _buildAnnouncementCard(BuildContext context, AnnouncementModel notice, bool canManage) {
+    final colors = Theme.of(context).colorScheme;
     Color iconBg;
     Color iconColor;
     IconData iconData;
@@ -224,9 +226,9 @@ class _AnnouncementsListScreenState extends ConsumerState<AnnouncementsListScree
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colors.surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: colors.outlineVariant),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.02),
@@ -277,34 +279,33 @@ class _AnnouncementsListScreenState extends ConsumerState<AnnouncementsListScree
                   const SizedBox(height: 4),
                   Text(
                     notice.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: colors.onSurface,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     notice.audienceLabel,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textSecondary,
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     'Published: $formattedDate',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.textMuted,
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
 
-            // 3-dots Menu (hidden for Parents)
-            if (!isParent)
+            if (canManage)
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textMuted),
                 padding: EdgeInsets.zero,

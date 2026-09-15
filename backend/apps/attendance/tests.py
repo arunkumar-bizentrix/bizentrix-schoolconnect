@@ -114,13 +114,17 @@ class AttendanceTests(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(Attendance.objects.count(), 0)
 
-    def test_admin_can_mark_any_class(self):
+    def test_admin_can_monitor_but_cannot_mark(self):
         self.client.force_authenticate(user=self.admin)
         res = self._mark(
             [{'student': self.outsider.id, 'status': 'PRESENT'}],
             classroom=self.class_b,
         )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            self.client.get(f'/api/v1/attendance/sheet/?class_id={self.class_b.id}').status_code,
+            status.HTTP_200_OK,
+        )
 
     def test_parent_cannot_mark(self):
         self.client.force_authenticate(user=self.parent)

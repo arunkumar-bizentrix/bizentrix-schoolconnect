@@ -35,6 +35,9 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
 
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
+    if (query.trim().isNotEmpty && _selectedClassId != null) {
+      setState(() => _selectedClassId = null);
+    }
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
       ref.read(studentsProvider.notifier).loadStudents(
         classId: _selectedClassId,
@@ -53,6 +56,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final studentsAsync = ref.watch(studentsProvider);
     final classesAsync = ref.watch(currentClassOptionsProvider);
     final userRole = ref.watch(authProvider).role;
@@ -63,7 +67,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
     final canManage = userRole.canManageStudents;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.surface,
       floatingActionButton: canManage
           ? FloatingActionButton(
               backgroundColor: AppColors.primary,
@@ -98,7 +102,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                             style: TextStyle(fontSize: 12)),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.border),
+                          side: BorderSide(color: colors.outlineVariant),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 8),
                           shape: RoundedRectangleBorder(
@@ -119,8 +123,8 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                         onChanged: _onSearchChanged,
                         decoration: InputDecoration(
                           hintText: 'Search by name or admission number...',
-                          hintStyle: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                          prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.textMuted),
+                          hintStyle: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+                          prefixIcon: Icon(Icons.search, size: 20, color: colors.onSurfaceVariant),
                           suffixIcon: _searchController.text.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.clear, size: 18),
@@ -132,15 +136,17 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                 )
                               : null,
                           filled: true,
-                          fillColor: Colors.white,
+                          fillColor: Theme.of(context).brightness == Brightness.dark
+                              ? colors.surfaceContainerHighest
+                              : Colors.white,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.border),
+                            borderSide: BorderSide(color: colors.outlineVariant),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.border),
+                            borderSide: BorderSide(color: colors.outlineVariant),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -158,7 +164,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                   data: (classes) {
                     // Counts come from the server. Counting the loaded page
                     // would say "20" for a class of 38.
-                    final total = classes.fold<int>(0, (sum, cls) => sum + cls.studentCount);
+                    final total = ref.read(studentsProvider.notifier).totalCount;
                     return SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
@@ -193,18 +199,20 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? colors.surfaceContainer
+                            : Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(color: colors.outlineVariant),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.people_outline, size: 40, color: AppColors.textMuted),
+                          Icon(Icons.people_outline, size: 40, color: colors.onSurfaceVariant),
                           const SizedBox(height: 10),
                           Text(
                             isParent ? 'No registered wards found' : 'No students found',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: colors.onSurface),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -215,7 +223,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                     : 'You see the students of the classes you '
                                         'teach. If this is empty, the school '
                                         'admin has not added you to a class yet.',
-                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -298,6 +306,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
       child: ChoiceChip(
@@ -305,14 +314,16 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
         selected: isSelected,
         onSelected: (_) => onTap(),
         selectedColor: AppColors.primary,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? colors.surfaceContainerHighest
+            : Colors.white,
         labelStyle: TextStyle(
-          color: isSelected ? Colors.white : AppColors.textSecondary,
+          color: isSelected ? Colors.white : colors.onSurfaceVariant,
           fontSize: 12,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
         ),
         side: BorderSide(
-          color: isSelected ? AppColors.primary : AppColors.border,
+          color: isSelected ? AppColors.primary : colors.outlineVariant,
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         showCheckmark: false,
@@ -327,12 +338,15 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
     bool isParent,
     bool isAdmin,
   ) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? colors.surfaceContainer
+            : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: colors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -362,29 +376,48 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
               children: [
                 Text(
                   student.fullName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: colors.onSurface,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Adm No: ${student.admissionNumber}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Class: ${student.className} (${student.academicYear})',
+                  student.classId == null
+                      ? 'Class: Unassigned'
+                      : 'Class: ${student.className}',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                if (isAdmin) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    student.parentNames.isEmpty
+                        ? 'Parent: Not linked'
+                        : 'Parent: ${student.parentNames.join(', ')}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: student.parentNames.isEmpty
+                          ? AppColors.statusOverdueText
+                          : colors.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -410,6 +443,11 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
           // Admin-only actions
           if (isAdmin) ...[
             IconButton(
+              icon: Icon(Icons.edit_outlined, size: 18, color: colors.onSurfaceVariant),
+              onPressed: () => _showEditStudentDialog(context, ref, student),
+              tooltip: 'Edit student / assign class',
+            ),
+            IconButton(
               icon: Badge(
                 isLabelVisible: student.parentIds.isNotEmpty,
                 label: Text('${student.parentIds.length}'),
@@ -417,7 +455,9 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                     size: 18, color: AppColors.primary),
               ),
               onPressed: () => _showParentLinkDialog(context, ref, student),
-              tooltip: 'Linked parents',
+              tooltip: student.parentNames.isEmpty
+                  ? 'Link a parent'
+                  : 'Linked: ${student.parentNames.join(', ')}',
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.statusOverdueText),
@@ -472,8 +512,8 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                 data: (parents) {
                   if (parents.isEmpty) {
                     return const Text(
-                      'No parent accounts yet. A parent must register in the '
-                      'app first, then you can link them here.',
+                      'No parent accounts yet. Create the parent login in '
+                      'People first, then link it here.',
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     );
                   }
@@ -654,6 +694,156 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showEditStudentDialog(
+    BuildContext context,
+    WidgetRef ref,
+    StudentModel student,
+  ) async {
+    final firstCtrl = TextEditingController(text: student.firstName);
+    final lastCtrl = TextEditingController(text: student.lastName);
+    final admCtrl = TextEditingController(text: student.admissionNumber);
+    final formKey = GlobalKey<FormState>();
+
+    final List<ClassModel> classes;
+    try {
+      classes = await ref.read(
+        classOptionsProvider(AppConstants.currentAcademicYear).future,
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load classes. Try again.')),
+      );
+      return;
+    }
+    if (!context.mounted || classes.isEmpty) return;
+
+    int selectedClassId = classes.any((c) => c.id == student.classId)
+        ? student.classId!
+        : classes.first.id;
+    var saving = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'Edit Student',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+          ),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: firstCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'First Name *',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: lastCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Last Name *',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: admCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'Admission Number *',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    initialValue: selectedClassId,
+                    decoration: const InputDecoration(
+                      labelText: 'Class *',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: classes
+                        .map((c) => DropdownMenuItem(
+                              value: c.id,
+                              child: Text(c.displayName),
+                            ))
+                        .toList(),
+                    onChanged: saving
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              setDialogState(() => selectedClassId = value);
+                            }
+                          },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDialogState(() => saving = true);
+                      final error = await ref.read(studentsProvider.notifier).updateStudent(
+                            student.id,
+                            firstName: firstCtrl.text.trim(),
+                            lastName: lastCtrl.text.trim(),
+                            admissionNumber: admCtrl.text.trim().toUpperCase(),
+                            classEnrolled: selectedClassId,
+                          );
+                      if (!dialogCtx.mounted) return;
+                      if (error != null) {
+                        setDialogState(() => saving = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(error),
+                            backgroundColor: AppColors.priorityUrgentText,
+                          ),
+                        );
+                        return;
+                      }
+                      Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Student updated successfully.')),
+                        );
+                      }
+                    },
+              child: saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    firstCtrl.dispose();
+    lastCtrl.dispose();
+    admCtrl.dispose();
   }
 
   void _confirmDeleteStudent(BuildContext context, WidgetRef ref, StudentModel student) {

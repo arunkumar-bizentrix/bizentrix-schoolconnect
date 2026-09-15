@@ -30,6 +30,7 @@ class MainNavScaffold extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = Theme.of(context).colorScheme;
     final currentIndex = ref.watch(bottomNavIndexProvider);
     final user = ref.watch(authProvider).user;
     final isTeacher = user?.role == UserRole.teacher;
@@ -71,18 +72,16 @@ class MainNavScaffold extends ConsumerWidget {
         (currentIndex >= 0 && currentIndex < pages.length) ? currentIndex : 0;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: colors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
         toolbarHeight: 56,
-        shape:
-            const Border(bottom: BorderSide(color: AppColors.border, width: 1)),
+        shape: Border(bottom: BorderSide(color: colors.outlineVariant, width: 1)),
         leading: Builder(
           builder: (btnCtx) => IconButton(
-            icon:
-                const Icon(Icons.menu, color: AppColors.textPrimary, size: 24),
+            icon: Icon(Icons.menu, color: colors.onSurface, size: 24),
             onPressed: () => Scaffold.of(btnCtx).openDrawer(),
           ),
         ),
@@ -100,7 +99,7 @@ class MainNavScaffold extends ConsumerWidget {
             const SizedBox(width: 8),
             // Expanded + ellipsis: strictly bounds the title within the available
             // toolbar width on narrow phones, completely preventing RenderFlex overflow.
-            const Expanded(
+            Expanded(
               child: Text(
                 AppConstants.schoolName,
                 maxLines: 1,
@@ -108,7 +107,7 @@ class MainNavScaffold extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: colors.onSurface,
                   letterSpacing: -0.3,
                 ),
               ),
@@ -121,8 +120,8 @@ class MainNavScaffold extends ConsumerWidget {
             icon: Badge(
               isLabelVisible: unreadNotifsCount > 0,
               label: Text('$unreadNotifsCount'),
-              child: const Icon(Icons.notifications_outlined,
-                  color: AppColors.textPrimary, size: 22),
+              child: Icon(Icons.notifications_outlined,
+                  color: colors.onSurface, size: 22),
             ),
             onPressed: () {
               if (isParent) {
@@ -132,15 +131,14 @@ class MainNavScaffold extends ConsumerWidget {
                   context,
                   MaterialPageRoute(
                     builder: (_) => Scaffold(
-                      backgroundColor: AppColors.background,
+                      backgroundColor: colors.surface,
                       appBar: AppBar(
                         title: const Text('Notifications',
                             style: TextStyle(
                                 fontWeight: FontWeight.bold, fontSize: 16)),
-                        backgroundColor: Colors.white,
+                        backgroundColor: colors.surface,
                         elevation: 0,
-                        iconTheme:
-                            const IconThemeData(color: AppColors.textPrimary),
+                        iconTheme: IconThemeData(color: colors.onSurface),
                       ),
                       body: const NotificationsListScreen(),
                     ),
@@ -237,9 +235,9 @@ class MainNavScaffold extends ConsumerWidget {
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: AppColors.border, width: 1)),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            border: Border(top: BorderSide(color: colors.outlineVariant, width: 1)),
           ),
           child: BottomNavigationBar(
             currentIndex: safeIndex,
@@ -247,7 +245,7 @@ class MainNavScaffold extends ConsumerWidget {
               ref.read(bottomNavIndexProvider.notifier).state = index;
             },
             type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.white,
+            backgroundColor: colors.surface,
             selectedItemColor: AppColors.primary,
             unselectedItemColor: AppColors.textMuted,
             selectedFontSize: 11,
@@ -606,19 +604,6 @@ class MainNavScaffold extends ConsumerWidget {
                         title: 'Teachers & Parents',
                         icon: Icons.badge_outlined,
                         builder: (_) => const PeopleScreen(),
-                      ),
-                      _drawerItem(
-                        title: 'Attendance',
-                        icon: Icons.how_to_reg_outlined,
-                        isActive: false,
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const MarkAttendanceScreen()),
-                          );
-                        },
                       ),
                       _pushItem(
                         context,

@@ -552,6 +552,8 @@ class _TimetableEditorScreenState extends ConsumerState<TimetableEditorScreen> {
         final picked = await showTimePicker(
           context: context,
           initialTime: value ?? const TimeOfDay(hour: 9, minute: 0),
+          initialEntryMode: TimePickerEntryMode.inputOnly,
+          helpText: 'Enter time',
         );
         if (picked != null) onPick(picked);
       },

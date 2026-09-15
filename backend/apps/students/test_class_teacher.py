@@ -95,9 +95,9 @@ class ClassTeacherTests(APITestCase):
 
         self.assertEqual(self._mark_as(self.class_teacher).status_code, status.HTTP_200_OK)
 
-    def test_admin_can_always_mark(self):
+    def test_admin_cannot_mark(self):
         self._set_class_teacher(self.class_teacher.id)
-        self.assertEqual(self._mark_as(self.admin).status_code, status.HTTP_200_OK)
+        self.assertEqual(self._mark_as(self.admin).status_code, status.HTTP_403_FORBIDDEN)
 
     def test_without_a_class_teacher_any_assigned_teacher_still_marks(self):
         """Classes set up before class teachers existed keep working."""

@@ -7,7 +7,7 @@ class IsAnnouncementAuthorized(permissions.BasePermission):
     """
     Role-aware permissions for Announcements:
     - Admin: Full read & write access within their school.
-    - Teacher: Read all announcements in own school; can create & manage school/class announcements.
+    - Teacher: Read school notices and notices for assigned classes.
     - Parent: Strictly Read-Only access. Can see SCHOOL announcements and CLASS announcements
               only for classes where their children are enrolled.
     """
@@ -30,8 +30,9 @@ class IsAnnouncementAuthorized(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
 
-        # Write permissions (POST, PUT, PATCH, DELETE) restricted to Teachers and Admins
-        return user.role in ['ADMIN', 'TEACHER']
+        # School communication is owned by the office. Teachers consume
+        # notices but cannot publish, edit, or delete them.
+        return user.role == 'ADMIN'
 
     def has_object_permission(self, request, view, obj):
         user = request.user
@@ -64,13 +65,6 @@ class IsAnnouncementAuthorized(permissions.BasePermission):
                     return obj.target_class.teachers.filter(id=user.id).exists()
                 return False
 
-            # Modifying or deleting (PUT, PATCH, DELETE):
-            # Teacher cannot modify or delete school-wide announcements
-            if obj.audience_type == 'SCHOOL':
-                return False
-            # Teacher can only modify/delete announcements for classes assigned to them
-            if obj.audience_type == 'CLASS' and obj.target_class:
-                return obj.target_class.teachers.filter(id=user.id).exists()
             return False
 
         # Admins can view/manage school announcements

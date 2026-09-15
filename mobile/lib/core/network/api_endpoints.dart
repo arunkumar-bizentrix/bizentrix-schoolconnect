@@ -4,7 +4,6 @@ class ApiEndpoints {
   // Authentication & Profile
   static const String login = '/auth/token/';
   static const String refreshToken = '/auth/token/refresh/';
-  static const String authRegister = '/auth/register/';
   static const String userProfile = '/auth/me/';
   static const String changePassword = '/auth/change-password/';
   static const String schoolStaff = '/auth/staff/';
@@ -85,4 +84,3 @@ class ApiEndpoints {
   static const String notificationsUnreadCount = '/notifications/unread-count/';
   static const String registerDevice = '/notifications/register-device/';
 }
-

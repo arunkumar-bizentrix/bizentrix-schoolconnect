@@ -235,7 +235,8 @@ class NotificationService:
     def create_announcement_notifications(cls, announcement):
         """
         Dispatches notifications when an announcement is published.
-        - CLASS announcement: the unique parents of students in target_class.
+        - CLASS announcement: the unique parents of students plus every active
+          teacher assigned to target_class.
         - SCHOOL announcement: every active parent and every active teacher of
           the school - staff need the early-dismissal notice as much as
           families do. The author is not notified of their own notice.
@@ -255,6 +256,16 @@ class NotificationService:
                 for student in students:
                     for parent in student.parents.filter(is_active=True):
                         parent_users.add(parent)
+
+                parent_users.update(
+                    announcement.target_class.teachers.filter(
+                        role=User.Role.TEACHER,
+                        is_active=True,
+                    )
+                )
+                class_teacher = announcement.target_class.class_teacher
+                if class_teacher and class_teacher.is_active:
+                    parent_users.add(class_teacher)
             elif announcement.audience_type == 'SCHOOL':
                 parent_users.update(User.objects.filter(
                     school=announcement.school,

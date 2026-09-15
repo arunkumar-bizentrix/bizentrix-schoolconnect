@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/constants/app_constants.dart';
 import 'core/push/push_service.dart';
@@ -10,6 +11,7 @@ import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/providers/session_sync.dart';
 import 'features/notifications/providers/notifications_provider.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_provider.dart';
 
 class SchoolConnectApp extends ConsumerStatefulWidget {
   const SchoolConnectApp({super.key});
@@ -58,6 +60,7 @@ class _SchoolConnectAppState extends ConsumerState<SchoolConnectApp> {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     // When the signed-in user changes, drop every cached per-user list.
     // Without this, signing out and signing in as someone else on the same
@@ -71,19 +74,32 @@ class _SchoolConnectAppState extends ConsumerState<SchoolConnectApp> {
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
       routerConfig: router,
       builder: (context, child) {
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        final content = AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+            systemNavigationBarColor: Theme.of(context).colorScheme.surface,
+            systemNavigationBarIconBrightness:
+                dark ? Brightness.light : Brightness.dark,
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
         // Native mobile gets the exact device screen and untouched gesture system
         if (!kIsWeb) {
-          return child ?? const SizedBox.shrink();
+          return content;
         }
         // Web gets centered mobile frame
         return Container(
-          color: const Color(0xFF0F172A),
+          color: dark ? const Color(0xFF020617) : const Color(0xFFE2E8F0),
           alignment: Alignment.center,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 430),
-            child: child,
+            child: content,
           ),
         );
       },

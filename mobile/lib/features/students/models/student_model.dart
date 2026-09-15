@@ -10,6 +10,7 @@ class StudentModel {
   final String className;
   final String academicYear;
   final List<int> parentIds;
+  final List<String> parentNames;
   final bool isActive;
 
   const StudentModel({
@@ -22,6 +23,7 @@ class StudentModel {
     required this.className,
     this.academicYear = AppConstants.currentAcademicYear,
     this.parentIds = const [],
+    this.parentNames = const [],
     this.isActive = true,
   });
 
@@ -57,6 +59,10 @@ class StudentModel {
       className: json['class_name'] ?? json['class_enrolled_name'] ?? 'Class',
       academicYear: json['academic_year'] ?? AppConstants.currentAcademicYear,
       parentIds: parentIds,
+      parentNames: (json['parent_names'] as List<dynamic>? ?? const [])
+          .map((name) => name.toString())
+          .where((name) => name.trim().isNotEmpty)
+          .toList(),
       isActive: json['is_active'] ?? true,
     );
   }
@@ -72,6 +78,7 @@ class StudentModel {
       'class_name': className,
       'academic_year': academicYear,
       'parents': parentIds,
+      'parent_names': parentNames,
       'is_active': isActive,
     };
   }

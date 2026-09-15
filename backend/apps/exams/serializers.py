@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.students.models import Class, normalize_academic_year, validate_academic_year_format
 from apps.timetable.models import Subject
+from apps.timetable.models import TimetableSlot
 
 from .models import Exam, ExamPaper
 
@@ -132,6 +133,25 @@ class ExamSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'classroom_ids': 'One or more classes were not found.'})
             if len(subjects) != len(set(subject_ids)):
                 raise serializers.ValidationError({'subject_ids': 'One or more subjects were not found.'})
+            user = self.context.get('user')
+            if user and user.role == 'TEACHER':
+                unauthorized_classes = [c for c in classrooms if not c.teachers.filter(id=user.id).exists()]
+                if unauthorized_classes:
+                    raise serializers.ValidationError({
+                        'classroom_ids': 'You can create a test only for classes assigned to you.'
+                    })
+                for classroom in classrooms:
+                    for subject in subjects:
+                        if classroom.class_teacher_id == user.id:
+                            continue
+                        slots = TimetableSlot.objects.filter(classroom=classroom, subject=subject)
+                        if slots.filter(teacher=user).exists():
+                            continue
+                        if not slots.exclude(teacher__isnull=True).exists() and classroom.teachers.filter(id=user.id).exists():
+                            continue
+                        raise serializers.ValidationError({
+                            'subject_ids': f'You are not assigned to teach {subject.name} in {classroom}.'
+                        })
             attrs['_classrooms'] = classrooms
             attrs['_subjects'] = subjects
         return attrs

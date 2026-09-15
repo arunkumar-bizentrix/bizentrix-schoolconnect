@@ -53,6 +53,8 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
       initialDate: initial,
       firstDate: DateTime(DateTime.now().year - 1),
       lastDate: DateTime(DateTime.now().year + 2),
+      initialEntryMode: DatePickerEntryMode.inputOnly,
+      helpText: start ? 'Enter start date' : 'Enter end date',
     );
     if (picked == null) return;
     setState(() {

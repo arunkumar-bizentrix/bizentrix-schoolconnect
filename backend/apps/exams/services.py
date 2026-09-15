@@ -42,12 +42,11 @@ def can_enter_marks(user, paper):
 
     "Who teaches it" comes from the timetable, so the school records it once.
     The class teacher may always enter marks for their class (covering an
-    absent colleague), and so may the admin. A school that has not built its
+    absent colleague). Admins monitor and publish results but do not enter
+    marks. A school that has not built its
     timetable yet is not locked out: with no period of that subject scheduled,
     any teacher assigned to the class may enter it.
     """
-    if user.is_superuser or user.role == 'ADMIN':
-        return True
     if user.role != 'TEACHER':
         return False
 
@@ -217,6 +216,96 @@ def missing_marks(exam):
 # ---------------------------------------------------------------------------
 # publishing
 # ---------------------------------------------------------------------------
+
+def notify_test_scheduled(exam):
+    """Tell each linked parent that a teacher scheduled a class test."""
+    from apps.notifications.services import NotificationService
+
+    notifications = []
+    seen = set()
+    papers = exam.papers.select_related('classroom', 'subject')
+    subjects_by_class = defaultdict(list)
+    for paper in papers:
+        subjects_by_class[paper.classroom].append(paper.subject.name)
+
+    for classroom, subjects in subjects_by_class.items():
+        students = Student.objects.filter(
+            class_enrolled=classroom, is_active=True,
+        ).prefetch_related('parents')
+        subject_text = ', '.join(sorted(set(subjects)))
+        date_text = exam.start_date.strftime('%d %b %Y') if exam.start_date else 'Date to be announced'
+        for student in students:
+            for parent in student.parents.all():
+                key = (parent.id, student.id)
+                if not parent.is_active or key in seen:
+                    continue
+                seen.add(key)
+                notifications.append(Notification(
+                    recipient=parent,
+                    notification_type=Notification.NotificationType.RESULT,
+                    title=f'New class test: {exam.name}',
+                    message=(
+                        f'{student.first_name} has a {subject_text} test for '
+                        f'{classroom.name} - {classroom.section} on {date_text}.'
+                    ),
+                    exam=exam,
+                    student=student,
+                ))
+
+    if not notifications:
+        return 0
+    created = Notification.objects.bulk_create(notifications)
+    NotificationService._push(created)
+    return len(created)
+
+
+def notify_marks_updated(paper, student_ids):
+    """Tell linked parents the exact subject mark that was just entered."""
+    from apps.notifications.services import NotificationService
+
+    marks_by_student = {
+        mark.student_id: mark
+        for mark in Mark.objects.filter(
+            paper=paper,
+            student_id__in=set(student_ids),
+        )
+    }
+    students = Student.objects.filter(
+        id__in=set(student_ids), is_active=True,
+    ).prefetch_related('parents')
+    notifications = []
+    for student in students:
+        mark = marks_by_student.get(student.id)
+        if mark is None:
+            continue
+        student_name = student.first_name
+        if mark.is_absent:
+            message = (
+                f'{student_name} was marked absent for {paper.subject.name} '
+                f'in {paper.exam.name}.'
+            )
+        else:
+            shown_mark = format(mark.marks_obtained.normalize(), 'f')
+            message = (
+                f'{student_name} scored {shown_mark}/{paper.max_marks} '
+                f'in {paper.subject.name} for {paper.exam.name}.'
+            )
+        for parent in student.parents.all():
+            if not parent.is_active:
+                continue
+            notifications.append(Notification(
+                recipient=parent,
+                notification_type=Notification.NotificationType.RESULT,
+                title=f'{paper.subject.name} marks updated',
+                message=message,
+                exam=paper.exam,
+                student=student,
+            ))
+    if not notifications:
+        return 0
+    created = Notification.objects.bulk_create(notifications)
+    NotificationService._push(created)
+    return len(created)
 
 @transaction.atomic
 def publish_exam(exam, *, allow_incomplete=False):

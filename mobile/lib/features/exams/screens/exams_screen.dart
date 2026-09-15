@@ -33,6 +33,7 @@ class ExamsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isAdmin = ref.watch(authProvider).user?.role.isAdmin ?? false;
+    final isTeacher = ref.watch(authProvider).user?.role.isTeacher ?? false;
     final examsAsync = ref.watch(examsProvider);
 
     return Scaffold(
@@ -56,12 +57,12 @@ class ExamsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: isAdmin
+      floatingActionButton: (isAdmin || isTeacher)
           ? FloatingActionButton.extended(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               icon: const Icon(Icons.add),
-              label: const Text('New exam'),
+              label: Text(isTeacher ? 'New class test' : 'New exam'),
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const CreateExamScreen()),
@@ -86,7 +87,7 @@ class ExamsScreen extends ConsumerWidget {
                   title: 'No exams yet',
                   message: isAdmin
                       ? 'Create an exam, choose the classes and subjects, and teachers can start entering marks.'
-                      : 'When the office sets up an exam for your classes, it appears here for marks entry.',
+                      : 'Create a class test for your assigned class and subject, then enter student marks.',
                 ),
               ]);
             }

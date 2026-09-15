@@ -365,66 +365,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Registers a new teacher or parent and signs them straight in.
-  /// Returns null on success, or the server's message on failure.
-  Future<String?> register({
-    required String fullName,
-    required String password,
-    required String role,
-    String? email,
-    String? phoneNumber,
-  }) async {
-    state = state.copyWith(isLoading: true);
-    try {
-      final response = await apiClient.dio.post(
-        ApiEndpoints.authRegister,
-        data: {
-          'full_name': fullName,
-          'password': password,
-          'role': role.toUpperCase(),
-          if (email != null && email.isNotEmpty) 'email': email.trim().toLowerCase(),
-          if (phoneNumber != null && phoneNumber.isNotEmpty) 'phone_number': phoneNumber,
-        },
-      );
-
-      final data = response.data;
-      final accessToken = data['access']?.toString();
-      final refreshToken = data['refresh']?.toString();
-
-      if (accessToken == null || accessToken.isEmpty) {
-        state = state.copyWith(isLoading: false);
-        return 'Registration succeeded but no session was returned. Please sign in.';
-      }
-
-      await tokenStorage.saveTokens(
-        accessToken: accessToken,
-        refreshToken: refreshToken,
-      );
-
-      UserModel user;
-      if (data['user'] is Map<String, dynamic>) {
-        user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
-      } else {
-        final profileRes = await apiClient.dio.get(
-          ApiEndpoints.userProfile,
-          options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-        );
-        user = UserModel.fromJson(profileRes.data);
-      }
-
-      await tokenStorage.saveUserRole(user.role);
-      await tokenStorage.saveUserProfileJson(jsonEncode(user.toJson()));
-
-      state = AuthState(user: user);
-      _registerForPush();
-      return null;
-    } catch (e) {
-      final failure = apiClient.handleError(e);
-      state = AuthState(errorMessage: failure.message);
-      return failure.message;
-    }
-  }
-
   /// Replaces the user's password. On success the backend signs out every
   /// other session and returns fresh tokens for this device, which are kept.
   /// Returns null on success or the reason it failed.

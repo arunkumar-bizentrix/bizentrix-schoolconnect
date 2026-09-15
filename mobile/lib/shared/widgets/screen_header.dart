@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants/app_colors.dart';
-
 /// Page heading with an optional action button on the right.
 ///
 /// Laying this out as a plain `Row` of `Expanded(title)` + button is a trap:
@@ -28,6 +26,7 @@ class ScreenHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final titleBlock = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -36,10 +35,10 @@ class ScreenHeader extends StatelessWidget {
           title,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: colors.onSurface,
             letterSpacing: -0.5,
           ),
         ),
@@ -49,9 +48,9 @@ class ScreenHeader extends StatelessWidget {
             subtitle!,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: AppColors.textSecondary,
+              color: colors.onSurfaceVariant,
             ),
           ),
         ],

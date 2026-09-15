@@ -138,12 +138,13 @@ class ApiClient {
           if (statusCode == 401) {
             final code = responseData is Map ? responseData['code']?.toString() : null;
             final detail = responseData is Map ? responseData['detail']?.toString() : null;
-            if (code == 'no_active_account') {
-              return const AuthFailure('Wrong mobile number or password.');
-            }
+            final isPasswordLogin = error.requestOptions.path.endsWith('/auth/token/');
             // e.g. "Your temporary password has expired. Ask the school office to reset it."
             if (code == 'temporary_password_expired' && detail != null) {
               return AuthFailure(detail);
+            }
+            if (code == 'no_active_account' || isPasswordLogin) {
+              return const AuthFailure('Wrong mobile number or password.');
             }
             return const AuthFailure('Session expired or unauthorized. Please log in.');
           }

@@ -123,6 +123,17 @@ class ClassAndStudentAPITests(APITestCase):
         self.assertEqual(res_stu.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res_stu.data['school'], self.school_a.id)
 
+    def test_duplicate_admission_number_returns_clear_validation_error(self):
+        self.client.force_authenticate(user=self.admin_a)
+        response = self.client.post('/api/v1/students/', {
+            'admission_number': self.student_a1.admission_number.lower(),
+            'first_name': 'Duplicate',
+            'last_name': 'Student',
+            'class_enrolled': self.class_a1.id,
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('already belongs', str(response.data['admission_number']))
+
     def test_teacher_cannot_create_class(self):
         """Class creation is administrative; teachers are read-only here."""
         self.client.force_authenticate(user=self.teacher_a)

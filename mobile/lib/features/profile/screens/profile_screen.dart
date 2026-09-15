@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../shared/widgets/info_row.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/models/user_model.dart';
 
@@ -14,6 +15,7 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = Theme.of(context).colorScheme;
     final user = ref.watch(authProvider).user;
     final displayName = (user != null && user.fullName.trim().isNotEmpty)
         ? user.fullName.trim()
@@ -101,10 +103,10 @@ class ProfileScreen extends ConsumerWidget {
                   displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: colors.onSurface,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -121,9 +123,9 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 2),
           Text(
             email,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.textSecondary,
+              color: colors.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 10),
@@ -168,9 +170,9 @@ class ProfileScreen extends ConsumerWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: colors.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: colors.outlineVariant),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.02),
@@ -230,9 +232,9 @@ class ProfileScreen extends ConsumerWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: colors.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: colors.outlineVariant),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.02),
@@ -269,6 +271,57 @@ class ProfileScreen extends ConsumerWidget {
                 const Divider(height: 20, color: AppColors.border),
                 InfoRow(icon: Icons.phone_outlined, label: 'Phone', value: user?.phoneNumber ?? 'Not provided'),
               ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.brightness_6_outlined, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Appearance',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<ThemeMode>(
+                      segments: const [
+                        ButtonSegment(
+                          value: ThemeMode.system,
+                          icon: Icon(Icons.settings_suggest_outlined, size: 17),
+                          label: Text('System'),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.light,
+                          icon: Icon(Icons.light_mode_outlined, size: 17),
+                          label: Text('Light'),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.dark,
+                          icon: Icon(Icons.dark_mode_outlined, size: 17),
+                          label: Text('Dark'),
+                        ),
+                      ],
+                      selected: {ref.watch(themeModeProvider)},
+                      onSelectionChanged: (selection) {
+                        ref.read(themeModeProvider.notifier).setMode(selection.first);
+                      },
+                      showSelectedIcon: false,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 

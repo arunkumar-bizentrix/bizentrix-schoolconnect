@@ -52,6 +52,7 @@ class _SearchFieldState extends State<SearchField> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return TextField(
       controller: _controller,
       onChanged: _onChanged,
@@ -75,15 +76,17 @@ class _SearchFieldState extends State<SearchField> {
               )
             : null,
         filled: true,
-        fillColor: AppColors.background,
+        fillColor: Theme.of(context).brightness == Brightness.dark
+            ? colors.surfaceContainerHighest
+            : Colors.white,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: colors.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: colors.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

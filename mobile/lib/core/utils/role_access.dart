@@ -21,10 +21,10 @@ extension RoleAccess on UserRole {
   bool get canManageTeacherAssignments => isAdmin;
 
   /// Homework is the teacher's workspace, scoped to their assigned classes.
-  bool get canManageHomework => isAdmin || isTeacher;
+  bool get canManageHomework => isTeacher;
 
   /// Teachers may post to their own classes; only admins post school-wide.
-  bool get canManageAnnouncements => isAdmin || isTeacher;
+  bool get canManageAnnouncements => isAdmin;
   bool get canPostSchoolWideAnnouncements => isAdmin;
 }
 

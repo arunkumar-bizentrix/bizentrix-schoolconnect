@@ -1,7 +1,6 @@
 from django.db.models import Q
 from rest_framework import viewsets, permissions, filters
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
 from apps.notifications.services import NotificationService
 from apps.schools.downloads import serve_private_file
 from apps.schools.services import attach_user_to_school, get_school_for
@@ -113,16 +112,6 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         user = self.request.user
         school = attach_user_to_school(user)
 
-        audience_type = serializer.validated_data.get('audience_type', Announcement.AudienceType.SCHOOL)
-        target_class = serializer.validated_data.get('target_class')
-
-        if user.role == 'TEACHER':
-            if audience_type == Announcement.AudienceType.SCHOOL:
-                raise PermissionDenied("Teachers are not permitted to create school-wide announcements. Admin approval is required.")
-            if audience_type == Announcement.AudienceType.CLASS:
-                if not target_class or not target_class.teachers.filter(id=user.id).exists():
-                    raise PermissionDenied("You can only create announcements for classes assigned to you.")
-
         extra = {'created_by': user}
         if 'is_active' not in serializer.validated_data:
             extra['is_active'] = True
@@ -134,23 +123,6 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
 
         # Dispatch real-time in-app notifications for target parents
         NotificationService.create_announcement_notifications(instance)
-
-    def perform_update(self, serializer):
-        """
-        The object permission checks the notice as it is now; this checks what
-        the edit would turn it into. Without it a teacher could PATCH their
-        class notice into a school-wide one, or onto a class they do not teach.
-        """
-        user = self.request.user
-        if user.role == 'TEACHER':
-            instance = serializer.instance
-            audience = serializer.validated_data.get('audience_type', instance.audience_type)
-            target = serializer.validated_data.get('target_class', instance.target_class)
-            if audience != Announcement.AudienceType.CLASS:
-                raise PermissionDenied("Teachers can only post to their own classes.")
-            if not target or not target.teachers.filter(id=user.id).exists():
-                raise PermissionDenied("You can only post announcements for classes assigned to you.")
-        serializer.save()
 
     @action(detail=True, methods=['get'], url_path='attachment')
     def attachment(self, request, pk=None):

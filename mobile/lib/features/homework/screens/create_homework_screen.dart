@@ -51,6 +51,7 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      withData: true,
     );
 
     if (result != null && result.files.isNotEmpty) {
@@ -99,6 +100,16 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
       return;
     }
 
+    if (_pickedAttachment != null && _pickedAttachment!.bytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not read that attachment. Select the file again.'),
+          backgroundColor: AppColors.statusOverdueText,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     final error = await ref.read(homeworkProvider.notifier).createHomework(
@@ -109,7 +120,11 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
       description: _descriptionController.text.trim(),
       dueDate: _dueDate,
       dueTime: _dueTime,
-      attachmentFilePath: _pickedAttachment?.path,
+      attachmentBytes: _pickedAttachment?.bytes,
+      attachmentFileName: _pickedAttachment?.name,
+    ).timeout(
+      const Duration(seconds: 45),
+      onTimeout: () => 'Upload timed out. Check the server and try again.',
     );
 
     if (!mounted) return;
@@ -406,6 +421,8 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
                     initialDate: _dueDate,
                     firstDate: DateTime.now(),
                     lastDate: DateTime.now().add(const Duration(days: 365)),
+                    initialEntryMode: DatePickerEntryMode.inputOnly,
+                    helpText: 'Enter due date',
                   );
                   if (picked != null) setState(() => _dueDate = picked);
                 },
@@ -438,6 +455,8 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
                   final picked = await showTimePicker(
                     context: context,
                     initialTime: _dueTime ?? const TimeOfDay(hour: 16, minute: 0),
+                    initialEntryMode: TimePickerEntryMode.inputOnly,
+                    helpText: 'Enter due time',
                   );
                   if (picked != null) setState(() => _dueTime = picked);
                 },

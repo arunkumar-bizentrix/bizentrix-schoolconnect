@@ -126,7 +126,7 @@ class AnnouncementAPITests(APITestCase):
         })
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_teacher_can_create_announcement_for_assigned_class(self):
+    def test_teacher_cannot_create_announcement_for_assigned_class(self):
         self.client.force_authenticate(user=self.teacher_a)
         response = self.client.post('/api/v1/announcements/', {
             'title': 'Math Olympiad Registration',
@@ -135,9 +135,7 @@ class AnnouncementAPITests(APITestCase):
             'audience_type': 'CLASS',
             'target_class': self.class_a1.id,
         })
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['school'], self.school_a.id)
-        self.assertEqual(response.data['target_class'], self.class_a1.id)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_teacher_cannot_create_announcement_for_unassigned_class(self):
         self.client.force_authenticate(user=self.teacher_a)
@@ -150,7 +148,7 @@ class AnnouncementAPITests(APITestCase):
         })
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_teacher_can_update_and_delete_assigned_class_announcement(self):
+    def test_teacher_cannot_update_or_delete_assigned_class_announcement(self):
         ann = Announcement.objects.create(
             school=self.school_a,
             title='Initial Title',
@@ -165,12 +163,11 @@ class AnnouncementAPITests(APITestCase):
         update_res = self.client.patch(f'/api/v1/announcements/{ann.id}/', {
             'title': 'Updated Title',
         })
-        self.assertEqual(update_res.status_code, status.HTTP_200_OK)
-        self.assertEqual(update_res.data['title'], 'Updated Title')
+        self.assertEqual(update_res.status_code, status.HTTP_403_FORBIDDEN)
 
         delete_res = self.client.delete(f'/api/v1/announcements/{ann.id}/')
-        self.assertEqual(delete_res.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Announcement.objects.filter(id=ann.id).exists())
+        self.assertEqual(delete_res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Announcement.objects.filter(id=ann.id).exists())
 
     def test_teacher_cannot_update_or_delete_unassigned_class_announcement(self):
         ann = Announcement.objects.create(
@@ -238,8 +235,7 @@ class AnnouncementAPITests(APITestCase):
             'audience_type': 'CLASS',
             'target_class': self.class_b1.id,
         })
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('target_class', response.data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_parent_can_view_school_announcement(self):
         ann = Announcement.objects.create(

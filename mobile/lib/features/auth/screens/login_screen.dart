@@ -153,6 +153,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  void _handleForgotPassword() {
+    final digits = _usernameController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    _countdownTimer?.cancel();
+    setState(() {
+      _authMethod = AuthMethod.whatsappOtp;
+      _whatsappOtpSent = false;
+      _whatsappOtpController.clear();
+      if (digits.length >= 10) {
+        _phoneController.text = digits.substring(digits.length - 10);
+      }
+    });
+    _toast(
+      'Enter your registered mobile number. We will send a WhatsApp OTP to sign in.',
+    );
+  }
+
   Future<void> _handleSendWhatsAppOtp() async {
     final phone = _phoneController.text.trim().replaceAll(RegExp(r'[^0-9]'), '');
     if (phone.length < 10) {
@@ -339,7 +355,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           else
             _phoneStep(authState),
           const SizedBox(height: 18),
-          _registerLink(),
+          const Text(
+            'Login access is created by the school office. Contact the administrator if you need an account.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+          ),
         ],
       ),
     );
@@ -466,7 +486,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: authState.isLoading ? null : _handleForgotPassword,
+            child: const Text(
+              'Forgot password?',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
         _primaryButton(
           label: 'Sign in',
           loading: authState.isLoading,
@@ -645,32 +675,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _registerLink() {
-    return Center(
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          const Text(
-            "Don't have an account? ",
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          ),
-          GestureDetector(
-            onTap: () => _showRegistrationSheet(context),
-            child: const Text(
-              'Create one',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ───────────────────────────── shared bits ─────────────────────────────
 
   Widget _fieldLabel(String text) {
@@ -766,6 +770,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// Creates a real account through POST /auth/register/ and signs the user
   /// straight in. The previous sheet collected a name, email and role and then
   /// threw them away, sending only an OTP.
+  // Kept temporarily while older widget snapshots are migrated. There is no
+  // entry point to this legacy sheet and the backend has no public sign-up.
+  // ignore: unused_element
   void _showRegistrationSheet(BuildContext context) {
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController(text: _phoneController.text);
@@ -946,26 +953,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             }
 
                             setSheetState(() => submitting = true);
-                            final error = await ref
-                                .read(authProvider.notifier)
-                                .register(
-                                  fullName: name,
-                                  password: pass,
-                                  role: 'Parent',
-                                  email: emailCtrl.text.trim(),
-                                  phoneNumber: phone,
-                                );
                             if (!sheetCtx.mounted) return;
                             setSheetState(() => submitting = false);
-
-                            if (error == null) {
-                              Navigator.pop(sheetCtx);
-                              if (!mounted) return;
-                              _toast('Welcome to SchoolConnect!');
-                              _goToDashboard();
-                            } else {
-                              _toast(error, error: true);
-                            }
+                            _toast(
+                              'Accounts are created by the school administrator.',
+                              error: true,
+                            );
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,

@@ -39,6 +39,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final classesAsync = ref.watch(classesProvider);
     final userRole = ref.watch(authProvider).role;
     final isParent = userRole.isParent;
@@ -106,15 +107,17 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                   child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? colors.surfaceContainerHighest
+                        : Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: colors.outlineVariant),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _selectedYear,
                       isExpanded: true,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                      style: TextStyle(fontSize: 12, color: colors.onSurface, fontWeight: FontWeight.w600),
                       items: _years.map((y) => DropdownMenuItem(value: y, child: Text(y))).toList(),
                       onChanged: (val) {
                         if (val != null && val != _selectedYear) {
@@ -133,15 +136,17 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                   child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? colors.surfaceContainerHighest
+                        : Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: colors.outlineVariant),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _selectedSection,
                       isExpanded: true,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                      style: TextStyle(fontSize: 12, color: colors.onSurface, fontWeight: FontWeight.w600),
                       items: _sections.map((s) => DropdownMenuItem(value: s, child: Text('Section: $s'))).toList(),
                       onChanged: (val) {
                         if (val != null && val != _selectedSection) {
@@ -165,18 +170,20 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? colors.surfaceContainer
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(color: colors.outlineVariant),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.meeting_room_outlined, size: 40, color: AppColors.textMuted),
+                        Icon(Icons.meeting_room_outlined, size: 40, color: colors.onSurfaceVariant),
                         const SizedBox(height: 10),
-                        const Text(
+                        Text(
                           'No classes found',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: colors.onSurface),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -188,7 +195,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                                       'The school admin assigns classes to '
                                       'teachers - ask them and this list fills '
                                       'in straight away.',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -207,7 +214,9 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                     final badgeBg = isEven ? AppColors.statClassesText : AppColors.statStudentsText;
 
                     return Material(
-                      color: Colors.white,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? colors.surfaceContainer
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       child: InkWell(
                         onTap: () => _showClassActionSheet(context, item),
@@ -216,7 +225,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.border),
+                            border: Border.all(color: colors.outlineVariant),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withValues(alpha: 0.02),
@@ -255,10 +264,10 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                                   children: [
                                     Text(
                                       item.displayName,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
-                                        color: AppColors.textPrimary,
+                                        color: colors.onSurface,
                                       ),
                                     ),
                                     const SizedBox(height: 3),
@@ -268,17 +277,17 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                                           : 'Faculty: ${item.teacherName}',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 12,
-                                        color: AppColors.textSecondary,
+                                        color: colors.onSurfaceVariant,
                                       ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       '${item.studentCount} Students • ${item.academicYear}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 11,
-                                        color: AppColors.textMuted,
+                                        color: colors.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
@@ -288,7 +297,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                               // Action Buttons for Admin and Teacher
                               if (canManage) ...[
                                 IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.textSecondary),
+                                  icon: Icon(Icons.edit_outlined, size: 18, color: colors.onSurfaceVariant),
                                   onPressed: () => _showAddOrEditClassDialog(context, ref, classToEdit: item),
                                   tooltip: 'Edit Class',
                                 ),
@@ -298,7 +307,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                                   tooltip: 'Delete Class',
                                 ),
                               ] else
-                                const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 20),
+                                Icon(Icons.chevron_right, color: colors.onSurfaceVariant, size: 20),
                             ],
                           ),
                         ),
@@ -630,9 +639,10 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
   }
 
   void _showClassActionSheet(BuildContext context, ClassModel item) {
+    final colors = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -648,7 +658,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.border,
+                    color: colors.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -681,26 +691,26 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                       children: [
                         Text(
                           item.displayName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: colors.onSurface,
                           ),
                         ),
                         Text(
                           '${item.studentCount} Students • Faculty: ${item.teacherName}',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
-              const Divider(height: 24, color: AppColors.border),
+              Divider(height: 24, color: colors.outlineVariant),
               ListTile(
                 leading: const Icon(Icons.people_outline, color: AppColors.primary),
                 title: const Text('View Students', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: const Text('Students enrolled in this class', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                subtitle: Text('Students enrolled in this class', style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant)),
                 trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -708,12 +718,12 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => Scaffold(
-                        backgroundColor: AppColors.background,
+                        backgroundColor: colors.surface,
                         appBar: AppBar(
                           title: Text('${item.displayName} Students', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          backgroundColor: Colors.white,
+                          backgroundColor: colors.surface,
                           elevation: 0,
-                          iconTheme: const IconThemeData(color: AppColors.textPrimary),
+                          iconTheme: IconThemeData(color: colors.onSurface),
                         ),
                         body: const StudentsScreen(),
                       ),
@@ -724,7 +734,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
               ListTile(
                 leading: const Icon(Icons.assignment_outlined, color: Color(0xFF4F46E5)),
                 title: const Text('View Class Homework', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: const Text('Homework assigned to this class', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                subtitle: Text('Homework assigned to this class', style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant)),
                 trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -732,12 +742,12 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => Scaffold(
-                        backgroundColor: AppColors.background,
+                        backgroundColor: colors.surface,
                         appBar: AppBar(
                           title: Text('${item.displayName} Homework', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          backgroundColor: Colors.white,
+                          backgroundColor: colors.surface,
                           elevation: 0,
-                          iconTheme: const IconThemeData(color: AppColors.textPrimary),
+                          iconTheme: IconThemeData(color: colors.onSurface),
                         ),
                         body: const HomeworkListScreen(),
                       ),
@@ -748,7 +758,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
               ListTile(
                 leading: const Icon(Icons.campaign_outlined, color: AppColors.priorityImportantText),
                 title: const Text('View Class Announcements', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: const Text('Notices published for this class', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                subtitle: Text('Notices published for this class', style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant)),
                 trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -756,12 +766,12 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => Scaffold(
-                        backgroundColor: AppColors.background,
+                        backgroundColor: colors.surface,
                         appBar: AppBar(
                           title: Text('${item.displayName} Notices', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          backgroundColor: Colors.white,
+                          backgroundColor: colors.surface,
                           elevation: 0,
-                          iconTheme: const IconThemeData(color: AppColors.textPrimary),
+                          iconTheme: IconThemeData(color: colors.onSurface),
                         ),
                         body: const AnnouncementsListScreen(),
                       ),

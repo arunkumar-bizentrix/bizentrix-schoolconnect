@@ -349,14 +349,13 @@ class CrossSchoolTests(SecurityFixture):
         self.child_a.refresh_from_db()
         self.assertEqual(self.child_a.class_enrolled_id, self.class_a.id)
 
-    def test_public_registration_ignores_a_school_id(self):
+    def test_public_registration_is_disabled(self):
         res = self.client.post('/api/v1/auth/register/', {
             'full_name': 'New Parent', 'password': 'Password@123', 'phone_number': '9822200001',
             'role': 'PARENT', 'school_id': self.other_school.id,
         }, format='json')
-        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        created = User.objects.get(phone_number='9822200001')
-        self.assertNotEqual(created.school_id, self.other_school.id)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(User.objects.filter(phone_number='9822200001').exists())
 
 
 class ProfileTakeoverTests(SecurityFixture):

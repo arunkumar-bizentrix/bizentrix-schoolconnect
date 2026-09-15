@@ -19,6 +19,7 @@ class _NotificationsListScreenState extends ConsumerState<NotificationsListScree
     'Unread',
     'Attendance',
     'Homework',
+    'Results',
     'Announcements',
   ];
 
@@ -79,7 +80,7 @@ class _NotificationsListScreenState extends ConsumerState<NotificationsListScree
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        'Updates on homework and announcements',
+                        'Updates on attendance, homework, results and announcements',
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -266,6 +267,8 @@ class _NotificationsListScreenState extends ConsumerState<NotificationsListScree
         return list.where((n) => n.isAttendance).toList();
       case 'Homework':
         return list.where((n) => n.isHomework).toList();
+      case 'Results':
+        return list.where((n) => n.isResult).toList();
       case 'Announcements':
         return list.where((n) => n.isAnnouncement).toList();
       case 'All':
@@ -277,6 +280,7 @@ class _NotificationsListScreenState extends ConsumerState<NotificationsListScree
   Widget _buildNotificationCard(BuildContext context, NotificationModel notification) {
     final isHomework = notification.isHomework;
     final isAttendance = notification.isAttendance;
+    final isResult = notification.isResult;
     final isRead = notification.isRead;
     final icon = isAttendance
         ? (notification.isAbsence
@@ -284,21 +288,27 @@ class _NotificationsListScreenState extends ConsumerState<NotificationsListScree
             : Icons.how_to_reg_rounded)
         : isHomework
             ? Icons.assignment_outlined
-            : Icons.campaign_rounded;
+            : isResult
+                ? Icons.fact_check_outlined
+                : Icons.campaign_rounded;
     final iconColor = isAttendance
         ? (notification.isAbsence
             ? AppColors.priorityUrgentText
             : AppColors.statStudentsText)
         : isHomework
             ? AppColors.socialIconColor
-            : AppColors.primary;
+            : isResult
+                ? const Color(0xFF7C3AED)
+                : AppColors.primary;
     final iconBg = isAttendance
         ? (notification.isAbsence
             ? AppColors.priorityUrgentBg
             : AppColors.statStudentsBg)
         : isHomework
             ? AppColors.socialIconBg
-            : const Color(0xFFEFF6FF);
+            : isResult
+                ? const Color(0xFFF3E8FF)
+                : const Color(0xFFEFF6FF);
     final formattedDate = _formatDate(notification.createdAt);
 
     return InkWell(
@@ -395,7 +405,9 @@ class _NotificationsListScreenState extends ConsumerState<NotificationsListScree
                               ? 'ATTENDANCE'
                               : isHomework
                                   ? 'HOMEWORK'
-                                  : 'ANNOUNCEMENT',
+                                  : isResult
+                                      ? 'RESULT'
+                                      : 'ANNOUNCEMENT',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
@@ -427,27 +439,34 @@ class _NotificationsListScreenState extends ConsumerState<NotificationsListScree
   void _showNotificationDetailModal(BuildContext context, NotificationModel notification) {
     final isHomework = notification.isHomework;
     final isAttendance = notification.isAttendance;
+    final isResult = notification.isResult;
     final icon = isAttendance
         ? (notification.isAbsence
             ? Icons.person_off_outlined
             : Icons.how_to_reg_rounded)
         : isHomework
             ? Icons.assignment_outlined
-            : Icons.campaign_rounded;
+            : isResult
+                ? Icons.fact_check_outlined
+                : Icons.campaign_rounded;
     final iconColor = isAttendance
         ? (notification.isAbsence
             ? AppColors.priorityUrgentText
             : AppColors.statStudentsText)
         : isHomework
             ? AppColors.socialIconColor
-            : AppColors.primary;
+            : isResult
+                ? const Color(0xFF7C3AED)
+                : AppColors.primary;
     final iconBg = isAttendance
         ? (notification.isAbsence
             ? AppColors.priorityUrgentBg
             : AppColors.statStudentsBg)
         : isHomework
             ? AppColors.socialIconBg
-            : const Color(0xFFEFF6FF);
+            : isResult
+                ? const Color(0xFFF3E8FF)
+                : const Color(0xFFEFF6FF);
 
     showModalBottomSheet(
       context: context,
@@ -488,7 +507,13 @@ class _NotificationsListScreenState extends ConsumerState<NotificationsListScree
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isHomework ? 'Homework Notification' : 'School Announcement',
+                        isAttendance
+                            ? 'Attendance Notification'
+                            : isHomework
+                                ? 'Homework Notification'
+                                : isResult
+                                    ? 'Result Notification'
+                                    : 'School Announcement',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,

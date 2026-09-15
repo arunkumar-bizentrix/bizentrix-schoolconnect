@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -110,7 +111,8 @@ class HomeworkNotifier extends StateNotifier<AsyncValue<List<HomeworkModel>>> {
     required String description,
     required DateTime dueDate,
     TimeOfDay? dueTime,
-    String? attachmentFilePath,
+    Uint8List? attachmentBytes,
+    String? attachmentFileName,
   }) async {
     try {
       final Map<String, dynamic> dataMap = {
@@ -128,8 +130,11 @@ class HomeworkNotifier extends StateNotifier<AsyncValue<List<HomeworkModel>>> {
       }
 
       dynamic payload;
-      if (attachmentFilePath != null && attachmentFilePath.isNotEmpty) {
-        dataMap['attachment'] = await MultipartFile.fromFile(attachmentFilePath);
+      if (attachmentBytes != null && attachmentBytes.isNotEmpty) {
+        dataMap['attachment'] = MultipartFile.fromBytes(
+          attachmentBytes,
+          filename: attachmentFileName ?? 'homework-attachment',
+        );
         payload = FormData.fromMap(dataMap);
       } else {
         payload = dataMap;

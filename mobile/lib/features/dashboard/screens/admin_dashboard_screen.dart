@@ -227,7 +227,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                     'Live Institution Metrics',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: theme.colorScheme.onSurface,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -303,11 +303,12 @@ class AdminDashboardScreen extends ConsumerWidget {
               'Administrative Actions',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 12),
             _buildActionTile(
+              context: context,
               icon: Icons.badge_rounded,
               title: 'Teachers & Parents',
               subtitle: 'Add a teacher, reset a password, deactivate someone who left',
@@ -319,6 +320,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             _buildActionTile(
+              context: context,
               icon: Icons.fact_check_rounded,
               title: 'Exams & Results',
               subtitle: 'Set exams, follow marks entry, publish results to parents',
@@ -330,6 +332,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             _buildActionTile(
+              context: context,
               icon: Icons.campaign_rounded,
               title: 'Broadcast Announcement',
               subtitle: 'Send instant circular to parents or teachers',
@@ -338,14 +341,16 @@ class AdminDashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             _buildActionTile(
+              context: context,
               icon: Icons.menu_book_rounded,
-              title: 'Manage Homework',
-              subtitle: 'Review assignments and submissions across classes',
+              title: 'Homework Overview',
+              subtitle: 'Monitor assignments across classes',
               color: AppColors.primary,
               onTap: () => ref.read(bottomNavIndexProvider.notifier).state = 3,
             ),
             const SizedBox(height: 8),
             _buildActionTile(
+              context: context,
               icon: Icons.person_add_alt_1_rounded,
               title: 'Student Directory',
               subtitle: 'Enroll and manage students in school classes',
@@ -354,6 +359,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             _buildActionTile(
+              context: context,
               icon: Icons.meeting_room_rounded,
               title: 'Class Overview',
               subtitle: 'Review class sections, subjects, and teachers',
@@ -371,7 +377,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                     'Recent Circulars',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: theme.colorScheme.onSurface,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -578,16 +584,18 @@ class AdminDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildActionTile({
+    required BuildContext context,
     required IconData icon,
     required String title,
     required String subtitle,
     required Color color,
     required VoidCallback onTap,
   }) {
+    final colors = Theme.of(context).colorScheme;
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: AppColors.border, width: 1),
+        side: BorderSide(color: colors.outlineVariant, width: 1),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -601,20 +609,20 @@ class AdminDashboardScreen extends ConsumerWidget {
         ),
         title: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
-            color: AppColors.textPrimary,
+            color: colors.onSurface,
           ),
         ),
         subtitle: Text(
           subtitle,
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
         ),
-        trailing: const Icon(
+        trailing: Icon(
           Icons.arrow_forward_ios_rounded,
           size: 14,
-          color: AppColors.textMuted,
+          color: colors.onSurfaceVariant,
         ),
         onTap: onTap,
       ),
@@ -622,6 +630,7 @@ class AdminDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildNoticePreview(BuildContext context, AnnouncementModel notice) {
+    final colors = Theme.of(context).colorScheme;
     Color priorityColor = AppColors.priorityNormalText;
     Color priorityBg = AppColors.priorityNormalBg;
     if (notice.priority == 'URGENT') {
@@ -637,9 +646,9 @@ class AdminDashboardScreen extends ConsumerWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
@@ -653,17 +662,17 @@ class AdminDashboardScreen extends ConsumerWidget {
         ),
         title: Text(
           notice.title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 13,
-            color: AppColors.textPrimary,
+            color: colors.onSurface,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
           '$dateStr • ${notice.audienceLabel}',
-          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
         ),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -693,13 +702,14 @@ class AdminDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildHomeworkPreview(BuildContext context, WidgetRef ref, HomeworkModel hw) {
+    final colors = Theme.of(context).colorScheme;
     final dueDateStr = DateFormat('dd MMM').format(hw.dueDate);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
@@ -713,30 +723,30 @@ class AdminDashboardScreen extends ConsumerWidget {
         ),
         title: Text(
           hw.title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 13,
-            color: AppColors.textPrimary,
+            color: colors.onSurface,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
           '${hw.subject} • ${hw.className}',
-          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
         ),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: AppColors.surfaceElevated,
+            color: colors.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
             'Due $dueDateStr',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
+              color: colors.onSurfaceVariant,
             ),
           ),
         ),
@@ -746,29 +756,34 @@ class AdminDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildEmptySection({required IconData icon, required String message}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 18, color: AppColors.textMuted),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              message,
-              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+    return Builder(
+      builder: (context) {
+        final colors = Theme.of(context).colorScheme;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: colors.outlineVariant),
           ),
-        ],
-      ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: colors.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  message,
+                  style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

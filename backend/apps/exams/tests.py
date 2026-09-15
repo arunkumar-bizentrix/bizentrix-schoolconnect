@@ -101,10 +101,10 @@ class ExamTestBase(APITestCase):
         maths = self.paper(exam_id, self.maths)
         science = self.paper(exam_id, self.science)
         students = [self.kavya, self.rahul, self.aarav, self.meena]
-        self.enter(self.admin, maths, [
+        self.enter(self.maths_teacher, maths, [
             {'student': s.id, 'marks_obtained': m} for s, m in zip(students, maths_marks)
         ])
-        self.enter(self.admin, science, [
+        self.enter(self.science_teacher, science, [
             {'student': s.id, 'marks_obtained': m} for s, m in zip(students, science_marks)
         ])
 
@@ -130,13 +130,25 @@ class ExamSetupTests(ExamTestBase):
         res = self.create_exam(start_date='2026-09-20', end_date='2026-09-10')
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_teacher_cannot_create_an_exam(self):
+    def test_teacher_creates_a_test_for_their_class_and_subject(self):
         self.as_user(self.maths_teacher)
         res = self.client.post('/api/v1/exams/', {
             'name': 'X', 'academic_year': '2026-2027',
             'classroom_ids': [self.classroom.id], 'subject_ids': [self.maths.id],
         }, format='json')
-        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Exam.objects.get(pk=res.data['id']).created_by, self.maths_teacher)
+        notice = Notification.objects.get(exam_id=res.data['id'], recipient=self.parent)
+        self.assertIn('New class test', notice.title)
+        self.assertEqual(notice.student, self.kavya)
+
+    def test_teacher_cannot_create_a_test_for_another_class(self):
+        self.as_user(self.maths_teacher)
+        res = self.client.post('/api/v1/exams/', {
+            'name': 'X', 'academic_year': '2026-2027',
+            'classroom_ids': [self.other_class.id], 'subject_ids': [self.maths.id],
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_admin_adjusts_a_single_paper(self):
         exam_id = self.create_exam().data['id']
@@ -152,13 +164,14 @@ class ExamSetupTests(ExamTestBase):
     def test_max_marks_cannot_drop_below_an_entered_mark(self):
         exam_id = self.create_exam().data['id']
         paper = self.paper(exam_id, self.maths)
-        self.enter(self.admin, paper, [{'student': self.kavya.id, 'marks_obtained': 88}])
+        self.enter(self.maths_teacher, paper, [{'student': self.kavya.id, 'marks_obtained': 88}])
+        self.as_user(self.admin)
         res = self.client.patch(f'/api/v1/exam-papers/{paper.id}/', {'max_marks': 50}, format='json')
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_exam_with_marks_cannot_be_deleted(self):
         exam_id = self.create_exam().data['id']
-        self.enter(self.admin, self.paper(exam_id, self.maths), [
+        self.enter(self.maths_teacher, self.paper(exam_id, self.maths), [
             {'student': self.kavya.id, 'marks_obtained': 50},
         ])
         self.as_user(self.admin)
@@ -194,6 +207,28 @@ class MarkEntryTests(ExamTestBase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data['saved'], 2)
         self.assertTrue(Mark.objects.get(student=self.rahul, paper=self.maths_paper).is_absent)
+        notice = Notification.objects.get(
+            exam_id=self.exam_id,
+            student=self.kavya,
+            title='Mathematics marks updated',
+        )
+        self.assertEqual(notice.recipient, self.parent)
+        self.assertEqual(
+            notice.message,
+            'Kavya scored 92/100 in Mathematics for Quarterly Exam.',
+        )
+
+    def test_admin_can_view_but_cannot_enter_marks(self):
+        self.as_user(self.admin)
+        sheet = self.client.get(f'/api/v1/exam-papers/{self.maths_paper.id}/marks/')
+        self.assertEqual(sheet.status_code, status.HTTP_200_OK)
+        self.assertFalse(sheet.data['paper']['can_enter_marks'])
+        result = self.client.post(
+            f'/api/v1/exam-papers/{self.maths_paper.id}/marks/',
+            {'entries': [{'student': self.kavya.id, 'marks_obtained': 88}]},
+            format='json',
+        )
+        self.assertEqual(result.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_teacher_cannot_enter_a_subject_they_do_not_teach(self):
         res = self.enter(self.science_teacher, self.maths_paper, [
@@ -312,7 +347,7 @@ class RankingTests(ExamTestBase):
 
     def test_absent_counts_as_zero_and_fails(self):
         self.enter_all(self.exam.id, [95, 70, 80, 60], [85, 80, 70, 60])
-        self.enter(self.admin, self.paper(self.exam.id, self.science), [
+        self.enter(self.science_teacher, self.paper(self.exam.id, self.science), [
             {'student': self.kavya.id, 'is_absent': True},
         ])
         by_name = {r['student_name']: r for r in compute_class_results(self.exam, self.classroom)['rows']}
@@ -320,11 +355,11 @@ class RankingTests(ExamTestBase):
         self.assertEqual(by_name['Kavya']['result'], 'FAIL')
 
     def test_student_with_a_missing_mark_is_not_ranked(self):
-        self.enter(self.admin, self.paper(self.exam.id, self.maths), [
+        self.enter(self.maths_teacher, self.paper(self.exam.id, self.maths), [
             {'student': self.kavya.id, 'marks_obtained': 99},
             {'student': self.rahul.id, 'marks_obtained': 50},
         ])
-        self.enter(self.admin, self.paper(self.exam.id, self.science), [
+        self.enter(self.science_teacher, self.paper(self.exam.id, self.science), [
             {'student': self.rahul.id, 'marks_obtained': 50},
         ])
         results = compute_class_results(self.exam, self.classroom)
@@ -372,7 +407,7 @@ class PublishingTests(ExamTestBase):
         self.exam_id = self.create_exam().data['id']
 
     def test_publish_refuses_while_marks_are_missing(self):
-        self.enter(self.admin, self.paper(self.exam_id, self.maths), [
+        self.enter(self.maths_teacher, self.paper(self.exam_id, self.maths), [
             {'student': self.kavya.id, 'marks_obtained': 90},
         ])
         self.as_user(self.admin)
@@ -398,7 +433,10 @@ class PublishingTests(ExamTestBase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data['parents_notified'], 1)
 
-        note = Notification.objects.get(recipient=self.parent)
+        note = Notification.objects.get(
+            recipient=self.parent,
+            title='Quarterly Exam results are out',
+        )
         self.assertEqual(note.notification_type, 'RESULT')
         self.assertEqual(note.title, 'Quarterly Exam results are out')
         self.assertEqual(note.message, 'Kavya scored 180/200 (90%) · Grade A2 · Rank 1 of 4.')

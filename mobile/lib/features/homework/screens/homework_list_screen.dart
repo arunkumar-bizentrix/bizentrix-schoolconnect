@@ -6,7 +6,7 @@ import '../../../core/files/protected_file.dart';
 import '../../../shared/widgets/screen_header.dart';
 import '../../../shared/widgets/load_more_footer.dart';
 import '../../../shared/widgets/info_row.dart';
-import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/role_access.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/homework_provider.dart';
 import '../models/homework_model.dart';
@@ -33,22 +33,22 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final homeworkAsync = ref.watch(homeworkProvider);
     final user = ref.watch(authProvider).user;
-    final isParent = user?.role == UserRole.parent;
+    final canManage = user?.role.canManageHomework ?? false;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row with Add Homework Button (hidden for Parents)
+          // Teachers create homework; admins and parents monitor it read-only.
           ScreenHeader(
             title: 'Homework',
             subtitle: 'Assignments and coursework',
-            action: isParent
-                ? null
-                : ElevatedButton.icon(
+            action: canManage
+                ? ElevatedButton.icon(
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -64,24 +64,27 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       elevation: 0,
                     ),
-                  ),
+                  )
+                : null,
           ),
           const SizedBox(height: 14),
 
           // Search Input Field
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? colors.surfaceContainerHighest
+                  : Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: colors.outlineVariant),
             ),
             child: TextField(
               controller: _searchController,
               onChanged: (val) => setState(() => _searchQuery = val.trim()),
               decoration: InputDecoration(
                 hintText: 'Search homework by title, subject, class...',
-                hintStyle: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.textMuted),
+                hintStyle: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+                prefixIcon: Icon(Icons.search, size: 20, color: colors.onSurfaceVariant),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 18),
@@ -112,13 +115,15 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                   selected: isSelected,
                   onSelected: (_) => setState(() => _selectedTab = tab),
                   selectedColor: AppColors.primary,
-                  backgroundColor: Colors.white,
+                  backgroundColor: Theme.of(context).brightness == Brightness.dark
+                      ? colors.surfaceContainerHighest
+                      : Colors.white,
                   labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : AppColors.textSecondary,
+                    color: isSelected ? Colors.white : colors.onSurfaceVariant,
                     fontSize: 12,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                   ),
-                  side: BorderSide(color: isSelected ? AppColors.primary : AppColors.border),
+                  side: BorderSide(color: isSelected ? AppColors.primary : colors.outlineVariant),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   showCheckmark: false,
                 ),
@@ -153,11 +158,11 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 40),
                     child: Column(
                       children: [
-                        Icon(Icons.assignment_outlined, size: 48, color: AppColors.textMuted.withValues(alpha: 0.5)),
+                        Icon(Icons.assignment_outlined, size: 48, color: colors.onSurfaceVariant.withValues(alpha: 0.5)),
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           'No homework available.',
-                          style: TextStyle(fontSize: 14, color: AppColors.textMuted, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 14, color: colors.onSurfaceVariant, fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
@@ -172,7 +177,7 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final item = filtered[index];
-                  return _buildHomeworkCard(item, index, isParent);
+                  return _buildHomeworkCard(item, index, !canManage);
                 },
               );
             },
@@ -190,7 +195,7 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                     Text(
                       'Error loading homework: $err',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
@@ -229,6 +234,7 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
   }
 
   Widget _buildHomeworkCard(HomeworkModel item, int index, bool isParent) {
+    final colors = Theme.of(context).colorScheme;
     Color iconBg;
     Color iconColor;
     IconData iconData;
@@ -257,7 +263,9 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
         : DateFormat('MMM dd, yyyy').format(item.dueDate);
 
     return Material(
-      color: Colors.white,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? colors.surfaceContainer
+          : Colors.white,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: () => _showHomeworkDetailModal(context, item, isParent),
@@ -266,7 +274,7 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: colors.outlineVariant),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.02),
@@ -300,10 +308,10 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                         Expanded(
                           child: Text(
                             item.title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
+                              color: colors.onSurface,
                             ),
                           ),
                         ),
@@ -328,12 +336,12 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                     const SizedBox(height: 3),
                     Text(
                       item.className.isNotEmpty ? item.className : item.subject,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Due: $formattedDate',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                      style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
                     ),
                     if (item.description.isNotEmpty) ...[
                       const SizedBox(height: 4),
@@ -341,7 +349,7 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                         item.description,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                        style: TextStyle(fontSize: 12, color: colors.onSurface),
                       ),
                     ],
                   ],
@@ -351,7 +359,7 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
               // Action Menu (hidden for Parents)
               if (!isParent)
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textMuted),
+                  icon: Icon(Icons.more_vert, size: 18, color: colors.onSurfaceVariant),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onSelected: (val) {
@@ -362,13 +370,13 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                     }
                   },
                   itemBuilder: (ctx) => [
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'edit',
                       child: Row(
                         children: [
-                          Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
-                          SizedBox(width: 8),
-                          Text('Edit', style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+                          const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          Text('Edit', style: TextStyle(color: colors.onSurface, fontSize: 13)),
                         ],
                       ),
                     ),
@@ -427,6 +435,7 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
   }
 
   void _showHomeworkDetailModal(BuildContext context, HomeworkModel item, bool isParent) {
+    final colors = Theme.of(context).colorScheme;
     final formattedAssigned = DateFormat('MMM dd, yyyy').format(item.assignedDate);
     final formattedDue = item.dueDisplay.isNotEmpty
         ? item.dueDisplay
@@ -434,7 +443,7 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -451,7 +460,7 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.border,
+                    color: colors.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -497,10 +506,10 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
               const SizedBox(height: 10),
               Text(
                 item.title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: colors.onSurface,
                   letterSpacing: -0.3,
                 ),
               ),
@@ -508,32 +517,32 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.background,
+                  color: colors.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: colors.outlineVariant),
                 ),
                 child: Column(
                   children: [
                     InfoRow(icon: Icons.meeting_room_outlined, label: 'Class', value: item.className.isNotEmpty ? item.className : 'Assigned Class', valueFontSize: 12, spacing: 8),
-                    const Divider(height: 16, color: AppColors.border),
+                    Divider(height: 16, color: colors.outlineVariant),
                     InfoRow(icon: Icons.person_outline, label: 'Assigned By', value: item.assignedByName.isNotEmpty ? item.assignedByName : 'Teacher', valueFontSize: 12, spacing: 8),
-                    const Divider(height: 16, color: AppColors.border),
+                    Divider(height: 16, color: colors.outlineVariant),
                     InfoRow(icon: Icons.event_available, label: 'Assigned Date', value: formattedAssigned, valueFontSize: 12, spacing: 8),
-                    const Divider(height: 16, color: AppColors.border),
+                    Divider(height: 16, color: colors.outlineVariant),
                     InfoRow(icon: Icons.event_busy, label: 'Due', value: formattedDue, valueFontSize: 12, spacing: 8),
                   ],
                 ),
               ),
               if (item.description.isNotEmpty) ...[
                 const SizedBox(height: 14),
-                const Text(
+                Text(
                   'Instructions & Description',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colors.onSurface),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   item.description,
-                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+                  style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant, height: 1.4),
                 ),
               ],
               if (item.attachmentUrl != null && item.attachmentUrl!.isNotEmpty) ...[
@@ -651,6 +660,8 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                         initialDate: dueDate,
                         firstDate: DateTime.now().subtract(const Duration(days: 30)),
                         lastDate: DateTime.now().add(const Duration(days: 365)),
+                        initialEntryMode: DatePickerEntryMode.inputOnly,
+                        helpText: 'Enter due date',
                       );
                       if (picked != null) {
                         setDialogState(() => dueDate = picked);

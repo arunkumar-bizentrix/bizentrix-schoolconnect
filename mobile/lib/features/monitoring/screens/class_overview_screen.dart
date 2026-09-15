@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/role_access.dart';
 import '../../../shared/widgets/list_state_views.dart';
 import '../../attendance/screens/mark_attendance_screen.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../exams/models/exam_models.dart';
 import '../../exams/screens/exam_detail_screen.dart';
 import '../../exams/screens/exams_screen.dart';
@@ -23,6 +25,7 @@ class ClassOverviewScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final overviewAsync = ref.watch(classOverviewProvider(classId));
+    final isTeacher = ref.watch(authProvider).user?.role.isTeacher ?? false;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -51,11 +54,13 @@ class ClassOverviewScreen extends ConsumerWidget {
             children: [
               Section(
                 title: 'Today',
-                trailing: TextButton(
-                  onPressed: () => Navigator.push(
-                      context, MaterialPageRoute(builder: (_) => MarkAttendanceScreen(initialClassId: classId))),
-                  child: const Text('Attendance'),
-                ),
+                trailing: isTeacher
+                    ? TextButton(
+                        onPressed: () => Navigator.push(
+                            context, MaterialPageRoute(builder: (_) => MarkAttendanceScreen(initialClassId: classId))),
+                        child: const Text('Mark attendance'),
+                      )
+                    : null,
                 child: c.attendanceMarkedToday
                     ? Wrap(spacing: 8, runSpacing: 8, children: [
                         Figure(value: '${c.presentToday}', label: 'Present', color: AppColors.statusActiveText),

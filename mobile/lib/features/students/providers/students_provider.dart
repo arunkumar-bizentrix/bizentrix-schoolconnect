@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/page_result.dart';
 import '../../../core/network/api_endpoints.dart';
@@ -49,7 +48,7 @@ class StudentsNotifier extends StateNotifier<AsyncValue<List<StudentModel>>> {
     }
   }
   final ApiClient apiClient;
-  String _currentAcademicYear = AppConstants.currentAcademicYear;
+  String? _currentAcademicYear;
   int? _currentClassId;
   String? _currentSearch;
 
@@ -62,20 +61,21 @@ class StudentsNotifier extends StateNotifier<AsyncValue<List<StudentModel>>> {
     int? classId,
     String? search,
   }) async {
-    _currentAcademicYear = academicYear ?? _currentAcademicYear;
+    if (academicYear != null) _currentAcademicYear = academicYear;
     _currentClassId = classId;
     _currentSearch = search;
 
     state = const AsyncValue.loading();
     try {
-      final queryParams = <String, dynamic>{
-        'academic_year': _currentAcademicYear,
-      };
+      final queryParams = <String, dynamic>{};
+      if (_currentAcademicYear != null) {
+        queryParams['academic_year'] = _currentAcademicYear;
+      }
       if (_currentClassId != null) {
         queryParams['class_id'] = _currentClassId;
       }
       if (_currentSearch != null && _currentSearch!.trim().isNotEmpty) {
-        queryParams['search'] = _currentSearch!.trim();
+        queryParams['name'] = _currentSearch!.trim();
       }
 
       final response = await apiClient.dio.get(

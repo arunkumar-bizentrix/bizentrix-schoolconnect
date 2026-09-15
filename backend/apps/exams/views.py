@@ -29,6 +29,8 @@ from .services import (
     compute_class_results,
     missing_marks,
     publish_exam,
+    notify_test_scheduled,
+    notify_marks_updated,
     report_card,
     unpublish_exam,
 )
@@ -114,6 +116,7 @@ class ExamViewSet(viewsets.ModelViewSet):
         context = super().get_serializer_context()
         if self.request.user.is_authenticated:
             context['school'] = get_school_for(self.request.user)
+            context['user'] = self.request.user
         return context
 
     def _require_admin(self):
@@ -121,9 +124,12 @@ class ExamViewSet(viewsets.ModelViewSet):
             raise PermissionDenied('Only school administrators can manage exams.')
 
     def perform_create(self, serializer):
-        self._require_admin()
         user = self.request.user
-        serializer.save(school=attach_user_to_school(user), created_by=user)
+        if not (_is_admin(user) or user.role == 'TEACHER'):
+            raise PermissionDenied('Only administrators and teachers can create tests.')
+        exam = serializer.save(school=attach_user_to_school(user), created_by=user)
+        if user.role == 'TEACHER':
+            notify_test_scheduled(exam)
 
     def perform_update(self, serializer):
         self._require_admin()
@@ -362,6 +368,12 @@ class ExamPaperViewSet(viewsets.GenericViewSet):
                 to_update, ['marks_obtained', 'is_absent', 'remarks', 'entered_by', 'updated_at']
             )
             saved = len(to_create) + len(to_update)
+
+        changed_student_ids = [
+            entry['student'] for entry in entries
+            if entry.get('is_absent') or entry.get('marks_obtained') is not None
+        ]
+        notify_marks_updated(paper, changed_student_ids)
 
         return Response({'saved': saved, 'cleared': cleared, **self._sheet(paper, user)})
 

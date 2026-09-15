@@ -183,11 +183,15 @@ class StudentViewSet(viewsets.ModelViewSet):
         # Filter: name search (first_name, last_name, or full name)
         name = params.get('name')
         if name:
-            queryset = queryset.filter(
-                Q(first_name__icontains=name) |
-                Q(last_name__icontains=name) |
-                Q(admission_number__icontains=name)
-            )
+            # Match a full-name query such as "Pandi Kumar" across separate
+            # first/last-name columns. Every word must match one searchable
+            # field, while a single admission number still works normally.
+            for term in name.split():
+                queryset = queryset.filter(
+                    Q(first_name__icontains=term) |
+                    Q(last_name__icontains=term) |
+                    Q(admission_number__icontains=term)
+                )
 
         first_name = params.get('first_name')
         if first_name:

@@ -424,6 +424,7 @@ class _PersonFormState extends ConsumerState<_PersonForm> {
   late final _phone = TextEditingController(text: widget.existing?.phoneNumber ?? '');
   late final _email = TextEditingController(text: widget.existing?.email ?? '');
   bool _saving = false;
+  String? _submitError;
 
   bool get _isTeacher => widget.role == 'TEACHER';
   bool get _isEdit => widget.existing != null;
@@ -438,7 +439,10 @@ class _PersonFormState extends ConsumerState<_PersonForm> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _submitError = null;
+    });
     final notifier = ref.read(peopleProvider(widget.role).notifier);
 
     if (_isEdit) {
@@ -451,7 +455,7 @@ class _PersonFormState extends ConsumerState<_PersonForm> {
       if (!mounted) return;
       setState(() => _saving = false);
       if (!result.isOk) {
-        _toast(context, result.error!, error: true);
+        setState(() => _submitError = result.error!);
         return;
       }
       Navigator.pop(context);
@@ -467,7 +471,7 @@ class _PersonFormState extends ConsumerState<_PersonForm> {
     if (!mounted) return;
     setState(() => _saving = false);
     if (!result.isOk) {
-      _toast(context, result.error!, error: true);
+      setState(() => _submitError = result.error!);
       return;
     }
     Navigator.pop(context);
@@ -531,6 +535,25 @@ class _PersonFormState extends ConsumerState<_PersonForm> {
                   return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(text) ? null : 'Enter a valid email';
                 },
               ),
+              if (_submitError != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.priorityUrgentBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.priorityUrgentBorder),
+                  ),
+                  child: Text(
+                    _submitError!,
+                    style: const TextStyle(
+                      color: AppColors.priorityUrgentText,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               FilledButton(
                 onPressed: _saving ? null : _submit,
@@ -624,7 +647,11 @@ Future<void> showLoginDetails(
               ),
             ),
             const SizedBox(height: 14),
-            _LoginLine(label: 'Mobile number', value: signInWith),
+            _LoginLine(label: 'Login username', value: person.username),
+            if (person.phoneNumber.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              _LoginLine(label: 'Or mobile number', value: person.phoneNumber),
+            ],
             const SizedBox(height: 10),
             _LoginLine(label: 'Temporary password', value: password ?? '-', emphasise: true),
             if (expiresText.isNotEmpty) ...[
@@ -640,7 +667,8 @@ Future<void> showLoginDetails(
             onPressed: () async {
               final message = 'Vivekananda School app login\n'
                   'Name: ${person.fullName}\n'
-                  'Mobile number: $signInWith\n'
+                  'Username: ${person.username}\n'
+                  '${person.phoneNumber.isEmpty ? '' : 'Mobile number: ${person.phoneNumber}\n'}'
                   'Temporary password: $password\n'
                   'You will be asked to choose your own password after signing in.';
               await Clipboard.setData(ClipboardData(text: message));

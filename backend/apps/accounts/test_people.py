@@ -152,7 +152,7 @@ class PeopleManagementTests(TestCase):
         )
 
     # ------------------------------------------------------------------
-    # public sign-up is parents only
+    # accounts are provisioned by the school office
     # ------------------------------------------------------------------
 
     def test_nobody_can_sign_themselves_up_as_a_teacher(self):
@@ -162,18 +162,18 @@ class PeopleManagementTests(TestCase):
             'phone_number': '9444400000',
             'role': 'TEACHER',
         }, format='json')
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
         self.assertFalse(User.objects.filter(phone_number='9444400000').exists())
 
-    def test_parents_can_still_sign_up(self):
+    def test_parents_cannot_sign_themselves_up(self):
         res = self.client.post('/api/v1/auth/register/', {
             'full_name': 'New Parent',
             'password': 'Password@123',
             'phone_number': '9444400001',
             'role': 'PARENT',
         }, format='json')
-        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(res.data['user']['role'], 'PARENT')
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(User.objects.filter(phone_number='9444400001').exists())
 
     # ------------------------------------------------------------------
     # after creation
