@@ -34,6 +34,9 @@ DEFAULT_FROM_EMAIL = 'test@schoolconnect.test'
 WHATSAPP_ACCESS_TOKEN = None
 WHATSAPP_PHONE_NUMBER_ID = None
 
+# No push leaves the test suite, whatever the developer has configured locally.
+FIREBASE_SERVICE_ACCOUNT_FILE = ''
+
 # Throttling stays wired up (the views declare it explicitly) but the rates are
 # lifted so they never interfere with functional assertions. The throttle tests
 # pin low rates locally with @override_settings.

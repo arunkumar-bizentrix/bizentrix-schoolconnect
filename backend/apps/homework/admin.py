@@ -11,6 +11,7 @@ class HomeworkAdmin(admin.ModelAdmin):
         'assigned_by',
         'assigned_date',
         'due_date',
+        'due_time',
         'school',
         'is_active',
     )

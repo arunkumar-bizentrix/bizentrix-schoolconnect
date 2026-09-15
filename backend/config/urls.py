@@ -30,6 +30,13 @@ urlpatterns = [
 
     # In-App Notifications Endpoints
     path('api/v1/', include('apps.notifications.urls')),
+
+    # Daily Attendance Endpoints
+    path('api/v1/', include('apps.attendance.urls')),
+
+    # Subjects & Weekly Timetable Endpoints
+    path('api/v1/', include('apps.timetable.urls')),
+    path('api/v1/', include('apps.exams.urls')),
 ]
 
 if settings.DEBUG:

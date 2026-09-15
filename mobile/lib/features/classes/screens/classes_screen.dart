@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../shared/widgets/screen_header.dart';
+import '../../../shared/widgets/load_more_footer.dart';
+import '../../../shared/widgets/search_field.dart';
 import '../../../core/utils/role_access.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../auth/providers/staff_provider.dart';
 import '../providers/classes_provider.dart';
 import '../models/class_model.dart';
 import '../../students/screens/students_screen.dart';
@@ -17,16 +22,18 @@ class ClassesScreen extends ConsumerStatefulWidget {
 }
 
 class _ClassesScreenState extends ConsumerState<ClassesScreen> {
-  String _selectedYear = '2025-2026';
+  String _selectedYear = AppConstants.currentAcademicYear;
+  String _search = '';
   String _selectedSection = 'All';
 
-  final List<String> _years = ['2025-2026', '2026-2027'];
+  final List<String> _years = AppConstants.academicYearOptions;
   final List<String> _sections = ['All', 'A', 'B', 'C'];
 
   void _onFilterChanged() {
     ref.read(classesProvider.notifier).loadClasses(
       academicYear: _selectedYear,
       section: _selectedSection == 'All' ? null : _selectedSection,
+      search: _search,
     );
   }
 
@@ -45,6 +52,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
         await ref.read(classesProvider.notifier).loadClasses(
           academicYear: _selectedYear,
           section: _selectedSection == 'All' ? null : _selectedSection,
+          search: _search,
         );
       },
       child: SingleChildScrollView(
@@ -53,59 +61,49 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Row: Title & Action Button
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isAdmin ? 'Classes' : isParent ? 'Classes' : 'My Classes',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.5,
+            ScreenHeader(
+              title: isAdmin || isParent ? 'Classes' : 'My Classes',
+              subtitle: isAdmin
+                  ? 'School class sections'
+                  : isParent
+                      ? 'Academic class sections'
+                      : 'Classes assigned to you',
+              action: canManage
+                  ? ElevatedButton.icon(
+                      onPressed: () => _showAddOrEditClassDialog(context, ref),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('New Class', style: TextStyle(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isAdmin
-                          ? 'School class sections'
-                          : isParent
-                              ? 'Academic class sections'
-                              : 'Classes assigned to you',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                if (canManage)
-                  ElevatedButton.icon(
-                    onPressed: () => _showAddOrEditClassDialog(context, ref),
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Add Class', style: TextStyle(fontSize: 12)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
-                    ),
-                  ),
-              ],
+                    )
+                  : null,
             ),
             const SizedBox(height: 16),
+
+            SearchField(
+              hintText: 'Search by class name or section…',
+              onSearch: (term) {
+                setState(() => _search = term);
+                ref.read(classesProvider.notifier).loadClasses(
+                      academicYear: _selectedYear,
+                      section: _selectedSection == 'All' ? null : _selectedSection,
+                      search: term,
+                    );
+              },
+            ),
+            const SizedBox(height: 14),
 
             // Filter Controls Row (Academic Year & Section)
             Row(
               children: [
                 // Academic Year Filter
-                Container(
+                Expanded(
+                  child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -115,6 +113,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _selectedYear,
+                      isExpanded: true,
                       style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                       items: _years.map((y) => DropdownMenuItem(value: y, child: Text(y))).toList(),
                       onChanged: (val) {
@@ -125,11 +124,13 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                       },
                     ),
                   ),
+                  ),
                 ),
                 const SizedBox(width: 10),
 
                 // Section Filter
-                Container(
+                Expanded(
+                  child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -139,6 +140,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _selectedSection,
+                      isExpanded: true,
                       style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                       items: _sections.map((s) => DropdownMenuItem(value: s, child: Text('Section: $s'))).toList(),
                       onChanged: (val) {
@@ -148,6 +150,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                         }
                       },
                     ),
+                  ),
                   ),
                 ),
               ],
@@ -181,7 +184,10 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                               ? 'No classes scheduled for the selected filter.'
                               : isAdmin
                                   ? 'Tap "+ Add Class" above to add sections.'
-                                  : 'No classes assigned yet.',
+                                  : 'You have not been added to a class yet. '
+                                      'The school admin assigns classes to '
+                                      'teachers - ask them and this list fills '
+                                      'in straight away.',
                           style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                           textAlign: TextAlign.center,
                         ),
@@ -257,7 +263,11 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
-                                      'Faculty: ${item.teacherName}',
+                                      item.classTeacherName != null
+                                          ? 'Class teacher: ${item.classTeacherName}'
+                                          : 'Faculty: ${item.teacherName}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: 12,
                                         color: AppColors.textSecondary,
@@ -331,6 +341,25 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                 ),
               ),
             ),
+
+            // Paged list: the API returns 20 at a time, so the roll is only
+            // fully reachable through this.
+            Builder(
+              builder: (context) {
+                final notifier = ref.read(classesProvider.notifier);
+                return LoadMoreFooter(
+                  loadedCount: classesAsync.value?.length ?? 0,
+                  totalCount: notifier.totalCount,
+                  hasMore: notifier.hasMore,
+                  isLoading: notifier.isLoadingMore,
+                  noun: 'classes',
+                  onLoadMore: () async {
+                    await notifier.loadMore();
+                    if (context.mounted) setState(() {});
+                  },
+                );
+              },
+            ),
             const SizedBox(height: 24),
           ],
         ),
@@ -344,16 +373,20 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
     final secCtrl = TextEditingController(text: classToEdit?.section ?? '');
     final yearCtrl = TextEditingController(text: classToEdit?.academicYear ?? _selectedYear);
     final formKey = GlobalKey<FormState>();
+    final selectedTeacherIds = <int>{...?classToEdit?.teacherIds};
+    int? classTeacherId = classToEdit?.classTeacherId;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           isEdit ? 'Edit Class' : 'Add New Class',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
         ),
-        content: Form(
+        content: SingleChildScrollView(
+          child: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -395,7 +428,123 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+
+              // Teacher assignment - admin only, and the backend enforces that
+              // too. Teachers assigned here are the ones who may post homework
+              // and class announcements for this class.
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Assigned Teachers',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Consumer(
+                builder: (context, innerRef, _) {
+                  final teachersAsync = innerRef.watch(teachersProvider);
+                  return teachersAsync.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: LinearProgressIndicator(minHeight: 2),
+                    ),
+                    error: (err, _) => const Text(
+                      'Could not load teachers. You can still save the class '
+                      'and assign teachers later.',
+                      style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    ),
+                    data: (teachers) {
+                      if (teachers.isEmpty) {
+                        return const Text(
+                          'No teacher accounts yet. Create teachers first, '
+                          'then assign them here.',
+                          style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                        );
+                      }
+                      return Container(
+                        constraints: const BoxConstraints(maxHeight: 180),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.border),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: ListView(
+                          shrinkWrap: true,
+                          children: teachers.map((teacher) {
+                            final selected = selectedTeacherIds.contains(teacher.id);
+                            return CheckboxListTile(
+                              dense: true,
+                              value: selected,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              title: Text(
+                                teacher.fullName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                              subtitle: Text(
+                                teacher.subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              onChanged: (checked) => setDialogState(() {
+                                if (checked == true) {
+                                  selectedTeacherIds.add(teacher.id);
+                                } else {
+                                  selectedTeacherIds.remove(teacher.id);
+                                  if (classTeacherId == teacher.id) classTeacherId = null;
+                                }
+                              }),
+                            );
+                          }).toList(),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 14),
+
+              // One teacher owns the daily attendance. Chosen from the ticked
+              // teachers so the class teacher always teaches the class.
+              Consumer(
+                builder: (context, innerRef, _) {
+                  final teachers = innerRef.watch(teachersProvider).value ?? const [];
+                  final candidates = teachers
+                      .where((teacher) => selectedTeacherIds.contains(teacher.id))
+                      .toList();
+                  final value = candidates.any((t) => t.id == classTeacherId) ? classTeacherId : null;
+                  return DropdownButtonFormField<int?>(
+                    initialValue: value,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'Class teacher',
+                      helperText: candidates.isEmpty
+                          ? 'Tick a teacher above first'
+                          : 'Takes the daily attendance',
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<int?>(value: null, child: Text('None')),
+                      for (final teacher in candidates)
+                        DropdownMenuItem<int?>(
+                          value: teacher.id,
+                          child: Text(teacher.fullName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                    onChanged: candidates.isEmpty
+                        ? null
+                        : (selected) => setDialogState(() => classTeacherId = selected),
+                  );
+                },
+              ),
             ],
+          ),
           ),
         ),
         actions: [
@@ -417,12 +566,16 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                   name: name,
                   section: section,
                   academicYear: academicYear,
+                  teacherIds: selectedTeacherIds.toList(),
+                  classTeacherId: classTeacherId,
                 );
               } else {
                 err = await ref.read(classesProvider.notifier).createClass(
                   name: name,
                   section: section,
                   academicYear: academicYear,
+                  teacherIds: selectedTeacherIds.toList(),
+                  classTeacherId: classTeacherId,
                 );
               }
 
@@ -442,6 +595,7 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
             child: Text(isEdit ? 'Save Changes' : 'Save Class'),
           ),
         ],
+        ),
       ),
     );
   }

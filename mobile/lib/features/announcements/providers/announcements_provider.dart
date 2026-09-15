@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/page_result.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../models/announcement_model.dart';
 
@@ -10,6 +11,42 @@ import '../models/announcement_model.dart';
 
 class AnnouncementsNotifier
     extends StateNotifier<AsyncValue<List<AnnouncementModel>>> {
+
+  // ── pagination ───────────────────────────────────────────────────────────
+  // The API pages at 20 rows. Without these the screen would show the first
+  // page and look like the rest vanished.
+  String? _nextPageUrl;
+  bool _loadingMore = false;
+  int _totalCount = 0;
+
+  /// Rows on the server, including ones not loaded yet.
+  int get totalCount => _totalCount;
+
+  /// Whether another page is waiting.
+  bool get hasMore => _nextPageUrl != null;
+
+  /// Whether a `loadMore` call is in flight.
+  bool get isLoadingMore => _loadingMore;
+
+  /// Appends the next page to what is already on screen.
+  Future<void> loadMore() async {
+    final url = _nextPageUrl;
+    if (url == null || _loadingMore) return;
+
+    _loadingMore = true;
+    try {
+      final response = await apiClient.dio.getUri(Uri.parse(url));
+      final page = PageResult.parse(response.data, AnnouncementModel.fromJson);
+      _nextPageUrl = page.nextUrl;
+      _totalCount = page.totalCount;
+      if (!mounted) return;
+      state = AsyncValue.data([...?state.value, ...page.items]);
+    } catch (_) {
+      // Keep what is already displayed; the next scroll retries.
+    } finally {
+      _loadingMore = false;
+    }
+  }
   final ApiClient apiClient;
   String _currentAcademicYear = AppConstants.currentAcademicYear;
   String? _currentPriority;
@@ -24,6 +61,7 @@ class AnnouncementsNotifier
     String? priority,
     String? audienceType,
     int? classId,
+    String? search,
   }) async {
     _currentAcademicYear = academicYear ?? _currentAcademicYear;
     _currentPriority = priority;
@@ -34,6 +72,11 @@ class AnnouncementsNotifier
       final queryParams = <String, dynamic>{
         'academic_year': _currentAcademicYear,
       };
+      // Search runs on the server: filtering a single 20-row page on the
+      // client would only ever search that page.
+      if (search != null && search.trim().isNotEmpty) {
+        queryParams['search'] = search.trim();
+      }
       if (_currentPriority != null && _currentPriority!.isNotEmpty) {
         queryParams['priority'] = _currentPriority;
       }
@@ -49,11 +92,13 @@ class AnnouncementsNotifier
         queryParameters: queryParams,
       );
 
-      final List<dynamic> results =
-          response.data is List ? response.data : (response.data['results'] ?? []);
-      final notices = results.map((item) => AnnouncementModel.fromJson(item)).toList();
-      state = AsyncValue.data(notices);
+      final page = PageResult.parse(response.data, AnnouncementModel.fromJson);
+      _nextPageUrl = page.nextUrl;
+      _totalCount = page.totalCount;
+      if (!mounted) return;
+      state = AsyncValue.data(page.items);
     } catch (e, st) {
+      if (!mounted) return;
       state = AsyncValue.error(apiClient.handleError(e).message, st);
     }
   }

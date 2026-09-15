@@ -49,3 +49,7 @@ app.*.map.json
 
 # Flutter DevTools (generated)
 devtools_options.yaml
+
+# Firebase config: re-downloadable from the console, kept out of the repo
+google-services.json
+android/app/google-services.json

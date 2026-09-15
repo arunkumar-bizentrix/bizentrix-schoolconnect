@@ -21,7 +21,7 @@ class AppConstants {
   // Base API configuration (Wi-Fi LAN IP or adb reverse fallback)
   static const String defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.0.6:8000/api/v1',
+    defaultValue: 'http://192.168.0.11:8000/api/v1',
   );
   static const String fallbackBaseUrl = 'http://127.0.0.1:8000/api/v1';
 
@@ -37,6 +37,16 @@ class AppConstants {
 
   /// Academic year used for all list queries until a session picker exists.
   static const String currentAcademicYear = '2026-2027';
+
+  /// Years offered in filter dropdowns: two past sessions, the current one,
+  /// and the next. Derived from [currentAcademicYear] so a screen can never
+  /// drift to a different default and silently hide the current year's data.
+  static List<String> get academicYearOptions {
+    final start = int.tryParse(currentAcademicYear.split('-').first) ?? 2026;
+    return [
+      for (var year = start - 2; year <= start + 1; year++) '$year-${year + 1}',
+    ];
+  }
 }
 
 /// System user roles

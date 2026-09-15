@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/role_access.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../classes/providers/classes_provider.dart';
 import '../providers/homework_provider.dart';
 import '../../students/providers/students_provider.dart';
@@ -22,6 +24,9 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   DateTime _dueDate = DateTime.now().add(const Duration(days: 3));
+  // Optional clock deadline. Null means "due that day", which is how most
+  // homework works - the teacher opts in to a time.
+  TimeOfDay? _dueTime;
   PlatformFile? _pickedAttachment;
   bool _isSubmitting = false;
 
@@ -52,6 +57,14 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
       setState(() => _pickedAttachment = result.files.first);
     }
   }
+
+  static const _monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  String _formatDueDate() =>
+      '${_dueDate.day} ${_monthNames[_dueDate.month - 1]} ${_dueDate.year}';
 
   void _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -95,6 +108,7 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
       dueDate: _dueDate,
+      dueTime: _dueTime,
       attachmentFilePath: _pickedAttachment?.path,
     );
 
@@ -135,6 +149,13 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
     }
 
     final classStudents = allStudents.where((s) => s.classId == _selectedClassId).toList();
+
+    // A teacher the admin has not put in charge of any class has nothing to
+    // assign homework to. Showing an empty dropdown leaves them guessing at a
+    // permission problem; say plainly whose job it is to fix.
+    if (classesAsync.hasValue && classes.isEmpty) {
+      return _noClassesYet(ref.watch(authProvider).user?.role.isAdmin ?? false);
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -226,12 +247,16 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
                                 color: !_assignToIndividual ? AppColors.primary : AppColors.textSecondary,
                               ),
                               const SizedBox(width: 6),
-                              Text(
+                              Flexible(
+                                child: Text(
                                 'Entire Class',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                   color: !_assignToIndividual ? AppColors.primary : AppColors.textSecondary,
+                                ),
                                 ),
                               ),
                             ],
@@ -262,12 +287,16 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
                                 color: _assignToIndividual ? AppColors.primary : AppColors.textSecondary,
                               ),
                               const SizedBox(width: 6),
-                              Text(
+                              Flexible(
+                                child: Text(
                                 'Specific Student',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                   color: _assignToIndividual ? AppColors.primary : AppColors.textSecondary,
+                                ),
                                 ),
                               ),
                             ],
@@ -368,7 +397,7 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
               ),
               const SizedBox(height: 18),
 
-              // Due Date Picker
+              // Deadline: date is required, time is optional.
               _buildLabel('Due Date *'),
               InkWell(
                 onTap: () async {
@@ -385,12 +414,62 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
                   decoration: _fieldBoxDecoration(),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.textSecondary),
+                      const Icon(Icons.calendar_today_outlined,
+                          size: 18, color: AppColors.textSecondary),
                       const SizedBox(width: 10),
-                      Text(
-                        '${_dueDate.year}-${_dueDate.month.toString().padLeft(2, '0')}-${_dueDate.day.toString().padLeft(2, '0')}',
-                        style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                      Expanded(
+                        child: Text(
+                          _formatDueDate(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 14, color: AppColors.textPrimary),
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              _buildLabel('Due Time (Optional)'),
+              InkWell(
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: _dueTime ?? const TimeOfDay(hour: 16, minute: 0),
+                  );
+                  if (picked != null) setState(() => _dueTime = picked);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: _fieldBoxDecoration(),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.schedule_rounded,
+                          size: 18, color: AppColors.textSecondary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _dueTime == null
+                              ? 'No specific time — due any time that day'
+                              : _dueTime!.format(context),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: _dueTime == null
+                                ? AppColors.textMuted
+                                : AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (_dueTime != null)
+                        GestureDetector(
+                          onTap: () => setState(() => _dueTime = null),
+                          child: const Icon(Icons.close_rounded,
+                              size: 18, color: AppColors.textMuted),
+                        ),
                     ],
                   ),
                 ),
@@ -467,6 +546,74 @@ class _CreateHomeworkScreenState extends ConsumerState<CreateHomeworkScreen> {
                     _isSubmitting ? 'Creating Homework...' : 'Create Homework',
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.3),
                   ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Shown when there is no class to assign homework to.
+  Widget _noClassesYet(bool isAdmin) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Create Homework',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.statClassesBg,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(Icons.class_outlined,
+                    size: 30, color: AppColors.statClassesText),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'No class assigned to you yet',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isAdmin
+                    ? 'Create a class first, then come back to set homework '
+                        'for it.'
+                    : 'Homework is set for a class you teach. Ask the school '
+                        'admin to add you to your class - it takes them a '
+                        'moment, and everything here opens up straight away.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],

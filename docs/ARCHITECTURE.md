@@ -48,16 +48,23 @@ backend/
     │   └── admin.py
     ├── accounts/             User, roles, JWT + OTP authentication
     │   ├── models.py         User(AbstractUser), OTPVerification
+    │   ├── backends.py       Sign in with username, phone number or email
     │   ├── serializers.py
-    │   ├── views.py          Login, register, profile, OTP, throttled JWT views
+    │   ├── views.py          Login, register, profile, OTP, people management
     │   ├── urls.py
-    │   └── services/         email_service.py, whatsapp_service.py
+    │   └── services/         accounts.py (admin-created logins),
+    │                         email_service.py, whatsapp_service.py
     ├── students/             Class, Student, StudentClassEnrollment
     │   ├── models.py  serializers.py  views.py  permissions.py  urls.py
+    │   └── today.py          The parent's Today screen in one request
     ├── homework/             Homework
     │   ├── models.py  serializers.py  views.py  permissions.py  urls.py
     ├── announcements/        Announcement (+ attachment validators.py)
-    └── notifications/        Notification + NotificationService fan-out
+    ├── attendance/           Attendance (one row per student per day)
+    ├── timetable/            Subject, TimetableSlot
+    ├── exams/                Exam, ExamPaper, Mark
+    │   └── services.py       Totals, ranks, publishing, report cards
+    └── notifications/        Notification + NotificationService fan-out, push
 ```
 
 ### One responsibility per file
@@ -134,7 +141,16 @@ data source to justify it.
 Three ways in, one session model.
 
 **Password** — `POST /api/v1/auth/token/` → `{access, refresh}`, then
-`GET /api/v1/auth/me/` for the profile and role.
+`GET /api/v1/auth/me/` for the profile and role. The identifier may be the
+username, the 10-digit mobile number or the email
+(`accounts/backends.py`); nobody at a school remembers a generated username.
+
+**Who gets an account** — parents may sign up themselves (they see nothing
+until the admin links a child). Teacher accounts are created only by the
+admin (`POST /api/v1/auth/staff/`), which returns a one-time password to hand
+over; `auth/register/` refuses `role=TEACHER`. Anyone can install the app, so
+a self-made teacher account would be one class assignment away from
+children's records.
 (`POST /api/v1/auth/login/` does both in one call and is used by the backend
 test suite; the app uses the two-step form.)
 
@@ -181,6 +197,13 @@ table below — keep the two in sync.
 | Create / edit / delete students | ✅ | ❌ | ❌ |
 | Manage class enrollments | ✅ | ❌ | ❌ |
 | Link / unlink parents | ✅ | ❌ | ❌ |
+| Create teacher / parent accounts, reset passwords, deactivate | ✅ | ❌ | ❌ |
+| Set a class's class teacher | ✅ | ❌ | ❌ |
+| Mark attendance | ✅ | class teacher (any assigned teacher if none set) | ❌ (own children, read only) |
+| Create exams, publish results | ✅ | ❌ | ❌ |
+| Enter marks | ✅ | subject they teach in that class (from the timetable), or as class teacher | ❌ |
+| Class result sheet with ranks | ✅ | classes they teach | ❌ |
+| Report card | all | students they teach | own children, published exams only |
 | Homework CRUD | all classes | assigned classes only | ❌ (read only) |
 | Class announcements | ✅ | assigned classes only | ❌ (read only) |
 | School-wide announcements | ✅ | ❌ | ❌ (read only) |
@@ -188,8 +211,8 @@ table below — keep the two in sync.
 | Profile | own | own | own |
 
 Teachers read classes and students; they do not administer them. Their write
-access lives entirely in Homework and Announcements, scoped to the classes
-assigned to them.
+access is homework, class announcements, attendance (as class teacher) and
+marks (for the subjects they teach), always scoped to their own classes.
 
 Enforced by `students/permissions.py` (`IsSchoolMember`),
 `homework/permissions.py` (`IsHomeworkAuthorized`) and
@@ -225,9 +248,15 @@ Nothing else may call `School.objects.first()`. Permission classes use
 
 ```
 School
+ ├── Subject
+ ├── Exam ──── ExamPaper (exam × class × subject, max/pass marks)
+ │                └── Mark (paper × student)
  └── Class ──── teachers (M2M → User, role=TEACHER)
+      │   └── class_teacher (FK → one of the teachers)
       ├── Student ──── parents (M2M → User, role=PARENT)
-      │    └── StudentClassEnrollment   (per academic year history)
+      │    ├── StudentClassEnrollment   (per academic year history)
+      │    └── Attendance               (one per day)
+      ├── TimetableSlot (weekday × period → subject, teacher)
       ├── Homework      (classroom, optionally one student)
       └── Announcement  (audience_type=CLASS → target_class)
 ```
@@ -275,19 +304,58 @@ per-year history so a promotion does not erase last year's record.
 ## 10. Notification flow
 
 ```
-Homework / Announcement created
+Homework / Attendance / Announcement created
         ↓ NotificationService (deduplicated per parent)
 Notification rows (one per recipient)
-        ↓ GET /api/v1/notifications/
-App list + unread badge
+        ├─→ GET /api/v1/notifications/     → app list + unread badge
+        └─→ push.send_to_tokens(...)       → the phone's notification tray
 ```
-
-Notifications are in-app only and are read by polling. There is no push
-delivery yet — adding FCM is a backend service plus a device-token endpoint,
-and would slot in beside `NotificationService`.
 
 Endpoints: list, `POST .../{id}/read/`, `POST .../mark-all-read/`,
 `GET .../unread-count/`. Every one is scoped to `recipient=request.user`.
+
+**Push delivery** lives in `notifications/push.py` (Firebase Cloud Messaging
+v1). `NotificationService._push()` calls it after each fan-out, so no caller
+has to know push exists. Two properties matter:
+
+- It **never raises**. A dead network or a rejected token must not fail the
+  request that set the homework.
+- It is **optional**. Without a service-account file `is_configured()` is
+  `False`, every send is a logged no-op, and the product still works in-app.
+
+Devices register at `POST /api/v1/notifications/register-device/` (upsert on
+the token) and release on sign-out via `DELETE` — a user may only delete their
+own token. Tokens Firebase reports as dead are deleted during the next
+fan-out. Setup steps are in [PUSH_SETUP.md](PUSH_SETUP.md).
+
+**Exams and results**
+
+1. The admin creates an exam, picking classes and subjects; one `ExamPaper` is
+   created per class and subject with common maximum and pass marks, which
+   can then be adjusted per paper.
+2. Teachers enter marks per paper. Who teaches a subject comes from the
+   timetable, so it is recorded once; the class teacher may enter any subject
+   of their class. A school without a timetable is not locked out - with no
+   period of that subject scheduled, any assigned teacher may enter it.
+3. Totals, percentages, pass/fail and ranks are computed from `Mark` rows on
+   every read (`exams/services.py`), never stored, so a corrected mark can
+   never leave a stale rank behind. Ranking is standard competition ranking
+   (two on 450 are both 2nd; the next is 4th) and only students with every
+   paper entered are ranked.
+4. Results are private to staff until the admin publishes. Publishing refuses
+   while marks are missing unless the admin explicitly accepts that, locks
+   marks, and sends each parent their own child's result. Unpublishing
+   reopens marks for correction.
+5. A report card is built from the student's own marks, so last year's
+   results survive promotion into a new class.
+
+**Parent Today** — `GET /api/v1/parent/today/` returns, per child: today's
+attendance and the year's percentage, today's periods, homework given today
+and due in the next three days, and the latest published result. One request
+instead of four screens.
+
+**Dates** — `TIME_ZONE = 'Asia/Kolkata'`. "Today" for attendance, homework
+and the Today screen rolls over at Indian midnight. Stored datetimes stay UTC.
 
 ---
 
@@ -299,8 +367,11 @@ Everything lives under `/api/v1/`.
 |---|---|---|
 | `auth/token/`, `auth/token/refresh/` | POST | JWT, throttled |
 | `auth/login/` | POST | Tokens + profile in one call |
-| `auth/register/` | POST | Parent/teacher self-registration |
+| `auth/register/` | POST | Parent self-registration (teacher refused) |
 | `auth/me/` | GET, PATCH | Profile, including `profile_picture` upload |
+| `auth/staff/?role=TEACHER\|PARENT` | GET, POST | Admin only. GET lists (`?search=`, `?include_inactive=1`, `?page=` for a paginated envelope); POST creates an account and returns a one-time password |
+| `auth/staff/{id}/` | PATCH | Admin: edit name/phone/email, `is_active` to deactivate |
+| `auth/staff/{id}/reset-password/` | POST | Admin: new one-time password |
 | `auth/otp/email/send/`, `auth/otp/email/verify/` | POST | Email OTP |
 | `auth/otp/send/`, `auth/otp/verify/` | POST | WhatsApp OTP |
 | `classes/`, `classes/{id}/` | GET, POST, PATCH, DELETE | Writes: admin only |
@@ -308,6 +379,13 @@ Everything lives under `/api/v1/`.
 | `students/{id}/enrollments/` | GET, POST | POST: admin only |
 | `students/{id}/link-parent/`, `unlink-parent/` | POST | Admin only |
 | `parent/children/` | GET | The caller's own children |
+| `parent/today/` | GET | Parent's Today view for each child (`?student_id=` for one) |
+| `attendance/mark/`, `sheet/`, `summary/` | POST, GET | Marking: admin + class teacher |
+| `subjects/`, `timetable/`, `timetable/week/`, `timetable/my/` | GET, POST, PATCH, DELETE | Writes: admin only |
+| `exams/`, `exams/{id}/` | GET, POST, PATCH, DELETE | Writes: admin; delete only before marks exist |
+| `exams/{id}/papers/`, `add-papers/`, `results/`, `progress/`, `publish/`, `unpublish/` | GET, POST | Results: staff; publish: admin |
+| `exam-papers/{id}/`, `exam-papers/{id}/marks/` | PATCH, DELETE, GET, POST | Marks: subject teacher, class teacher, admin |
+| `report-card/?student_id=` | GET | Parents: own children, published only |
 | `homework/`, `homework/{id}/` | GET, POST, PATCH, DELETE | Writes: admin + assigned teacher |
 | `announcements/`, `announcements/{id}/` | GET, POST, PATCH, DELETE | School-wide: admin only |
 | `notifications/…` | GET, POST | Always scoped to the caller |
@@ -357,7 +435,6 @@ not enough.
 | Add app state | `features/<domain>/providers/`; keep `core/` free of feature state |
 | Add a reusable widget | `shared/widgets/` once a second feature needs it — not before |
 | Add business logic | Backend `services.py` if it is a server rule; `features/<domain>/providers/` if it is a client rule |
-| Add push notifications | A service beside `notifications/services.py` plus a device-token endpoint; the fan-out logic already exists |
 | Add a new role | `User.Role`, then every `permissions.py`, then `RoleAccess`, then §5 |
 
 ---

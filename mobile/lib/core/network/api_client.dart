@@ -139,6 +139,12 @@ class ApiClient {
             return const AuthFailure('Session expired or unauthorized. Please log in.');
           }
           if (statusCode == 403) {
+            // The backend explains most refusals ("Attendance for this class
+            // is taken by its class teacher."); show that, not a generic line.
+            final detail = responseData is Map ? responseData['detail'] : null;
+            if (detail is String && detail.isNotEmpty) {
+              return AuthFailure(detail);
+            }
             return const AuthFailure('Access denied. You do not have permission for this action.');
           }
           if (statusCode == 404) {

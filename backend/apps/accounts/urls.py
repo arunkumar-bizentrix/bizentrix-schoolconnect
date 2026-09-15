@@ -7,12 +7,24 @@ from .views import (
     SendEmailOTPView,
     VerifyEmailOTPView,
     RegisterView,
+    SchoolStaffDetailView,
+    SchoolStaffListView,
+    StaffResetPasswordView,
 )
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='auth_login'),
     path('register/', RegisterView.as_view(), name='auth_register'),
     path('me/', UserProfileView.as_view(), name='auth_me'),
+
+    # Admin-only staff picker (assign teacher to class, link parent to student)
+    path('staff/', SchoolStaffListView.as_view(), name='auth_staff_list'),
+    path('staff/<int:pk>/', SchoolStaffDetailView.as_view(), name='auth_staff_detail'),
+    path(
+        'staff/<int:pk>/reset-password/',
+        StaffResetPasswordView.as_view(),
+        name='auth_staff_reset_password',
+    ),
     
     # Email OTP Authentication Endpoints
     path('otp/email/send/', SendEmailOTPView.as_view(), name='auth_otp_email_send'),

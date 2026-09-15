@@ -24,9 +24,11 @@ class NotificationsNotifier
           response.data is List ? response.data : (response.data['results'] ?? []);
       final notifications =
           results.map((item) => NotificationModel.fromJson(item)).toList();
+      if (!mounted) return;
       state = AsyncValue.data(notifications);
       await ref.read(unreadNotificationsCountProvider.notifier).fetchCount();
     } catch (e, st) {
+      if (!mounted) return;
       state = AsyncValue.error(apiClient.handleError(e).message, st);
     }
   }

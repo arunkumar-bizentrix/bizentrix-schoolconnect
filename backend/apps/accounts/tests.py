@@ -996,3 +996,75 @@ class AuthThrottlingTests(TestCase):
         with patch.dict(SimpleRateThrottle.THROTTLE_RATES, self.LOW_RATES, clear=False):
             statuses = [self.client.get('/api/v1/classes/').status_code for _ in range(6)]
         self.assertNotIn(status.HTTP_429_TOO_MANY_REQUESTS, statuses)
+
+
+class SchoolStaffListTests(TestCase):
+    """
+    /auth/staff/ backs the admin pickers. It must never become a way for a
+    teacher or parent to enumerate the school's accounts.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.school = School.objects.create(name="Staff Test School", code="STF01")
+        self.admin = User.objects.create_user(
+            username='staff_admin', password='Password@123',
+            role=User.Role.ADMIN, school=self.school,
+        )
+        self.teacher = User.objects.create_user(
+            username='staff_teacher', password='Password@123',
+            role=User.Role.TEACHER, school=self.school,
+            first_name='Priya', last_name='Sharma', email='priya@school.test',
+        )
+        self.parent = User.objects.create_user(
+            username='staff_parent', password='Password@123',
+            role=User.Role.PARENT, school=self.school,
+            first_name='Ravi', last_name='Kumar',
+        )
+
+    def test_admin_lists_teachers(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get('/api/v1/auth/staff/?role=TEACHER')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        usernames = [row['full_name'] for row in res.data]
+        self.assertIn('Priya Sharma', usernames)
+        self.assertEqual(len(res.data), 1)
+
+    def test_admin_lists_parents(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get('/api/v1/auth/staff/?role=PARENT')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual([row['full_name'] for row in res.data], ['Ravi Kumar'])
+
+    def test_search_filters_by_name_or_phone(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get('/api/v1/auth/staff/?role=TEACHER&search=priya')
+        self.assertEqual(len(res.data), 1)
+        res = self.client.get('/api/v1/auth/staff/?role=TEACHER&search=nobody')
+        self.assertEqual(len(res.data), 0)
+
+    def test_teacher_cannot_list_staff(self):
+        self.client.force_authenticate(user=self.teacher)
+        res = self.client.get('/api/v1/auth/staff/?role=TEACHER')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_parent_cannot_list_staff(self):
+        self.client.force_authenticate(user=self.parent)
+        res = self.client.get('/api/v1/auth/staff/?role=PARENT')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unauthenticated_is_rejected(self):
+        res = self.client.get('/api/v1/auth/staff/?role=TEACHER')
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_invalid_role_is_rejected(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get('/api/v1/auth/staff/?role=ADMIN')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_response_excludes_sensitive_fields(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get('/api/v1/auth/staff/?role=TEACHER')
+        row = res.data[0]
+        for leaked in ['password', 'is_superuser', 'is_staff', 'user_permissions']:
+            self.assertNotIn(leaked, row)

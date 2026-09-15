@@ -56,6 +56,9 @@ INSTALLED_APPS = [
     'apps.homework',
     'apps.announcements',
     'apps.notifications',
+    'apps.attendance',
+    'apps.timetable',
+    'apps.exams',
 ]
 
 MIDDLEWARE = [
@@ -93,6 +96,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
 
+# Sign in with username, phone number or email (see apps/accounts/backends.py).
+AUTHENTICATION_BACKENDS = [
+    'apps.accounts.backends.SchoolIdentifierBackend',
+]
+
 # Database Configuration (PostgreSQL)
 DATABASES = {
     'default': {
@@ -123,7 +131,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+# The school is in India. "Today" - attendance dates, homework assigned dates,
+# the parent's Today screen - must roll over at Indian midnight, not 05:30.
+# Stored datetimes remain UTC (USE_TZ); only local dates and display change.
+TIME_ZONE = 'Asia/Kolkata'
 USE_I18N = True
 USE_TZ = True
 
@@ -162,7 +173,10 @@ REST_FRAMEWORK = {
 # SimpleJWT configuration
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    # Parents open the app a few times a week. A short refresh window forced
+    # them back through OTP login constantly, which costs money per WhatsApp
+    # conversation and is the main reason people stop using an app like this.
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.getenv('REFRESH_TOKEN_DAYS', '90'))),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
@@ -184,6 +198,14 @@ WHATSAPP_ACCESS_TOKEN = os.getenv('WHATSAPP_ACCESS_TOKEN', None)
 WHATSAPP_PHONE_NUMBER_ID = os.getenv('WHATSAPP_PHONE_NUMBER_ID', None)
 WHATSAPP_API_VERSION = os.getenv('WHATSAPP_API_VERSION', 'v20.0')
 WHATSAPP_OTP_TEMPLATE = os.getenv('WHATSAPP_OTP_TEMPLATE', 'hello_world')
+
+# Firebase Cloud Messaging.
+# Point this at the service-account JSON downloaded from
+# Firebase Console > Project settings > Service accounts. Until the file
+# exists, push delivery is a logged no-op and the rest of the app is unaffected.
+FIREBASE_SERVICE_ACCOUNT_FILE = os.getenv(
+    'FIREBASE_SERVICE_ACCOUNT_FILE', 'firebase-service-account.json'
+)
 
 # Email Configuration (SMTP)
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')

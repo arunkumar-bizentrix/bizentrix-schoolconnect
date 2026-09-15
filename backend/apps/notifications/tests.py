@@ -7,7 +7,7 @@ from apps.schools.models import School
 from apps.students.models import Class, Student
 from apps.homework.models import Homework
 from apps.announcements.models import Announcement
-from apps.notifications.models import Notification
+from apps.notifications.models import DeviceToken, Notification
 
 User = get_user_model()
 
@@ -570,3 +570,135 @@ class WorkflowIntegrationTests(APITestCase):
         }, format='json')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertTrue(new_student.parents.filter(id=self.parent_kumar.id).exists())
+
+
+class DeviceRegistrationTests(APITestCase):
+    """
+    The phone registers itself so push has somewhere to go, and de-registers on
+    sign-out so the next person holding that phone does not receive the
+    previous user's notifications.
+    """
+
+    def setUp(self):
+        self.school = School.objects.create(name="Push School", code="PSH01")
+        self.parent = User.objects.create_user(
+            username='push_parent', password='Password@123',
+            role=User.Role.PARENT, school=self.school,
+        )
+        self.other_parent = User.objects.create_user(
+            username='push_other', password='Password@123',
+            role=User.Role.PARENT, school=self.school,
+        )
+        self.token = 'fcm-token-' + 'x' * 40
+
+    def test_signed_in_user_registers_a_device(self):
+        self.client.force_authenticate(user=self.parent)
+        res = self.client.post(
+            '/api/v1/notifications/register-device/',
+            {'token': self.token, 'platform': 'ANDROID', 'device_name': 'Redmi 12'},
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(res.data['registered'])
+
+        device = DeviceToken.objects.get(token=self.token)
+        self.assertEqual(device.user, self.parent)
+        self.assertTrue(device.is_active)
+
+    def test_registering_twice_updates_rather_than_duplicates(self):
+        self.client.force_authenticate(user=self.parent)
+        payload = {'token': self.token, 'platform': 'ANDROID'}
+        self.client.post('/api/v1/notifications/register-device/', payload, format='json')
+        res = self.client.post('/api/v1/notifications/register-device/', payload, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertFalse(res.data['created'])
+        self.assertEqual(DeviceToken.objects.filter(token=self.token).count(), 1)
+
+    def test_a_shared_phone_follows_whoever_signed_in_last(self):
+        """The row must move, not duplicate - otherwise both users get pushes."""
+        self.client.force_authenticate(user=self.parent)
+        self.client.post(
+            '/api/v1/notifications/register-device/',
+            {'token': self.token}, format='json',
+        )
+
+        self.client.force_authenticate(user=self.other_parent)
+        self.client.post(
+            '/api/v1/notifications/register-device/',
+            {'token': self.token}, format='json',
+        )
+
+        self.assertEqual(DeviceToken.objects.filter(token=self.token).count(), 1)
+        self.assertEqual(DeviceToken.objects.get(token=self.token).user, self.other_parent)
+
+    def test_sign_out_removes_the_registration(self):
+        self.client.force_authenticate(user=self.parent)
+        self.client.post(
+            '/api/v1/notifications/register-device/',
+            {'token': self.token}, format='json',
+        )
+
+        res = self.client.delete(
+            '/api/v1/notifications/register-device/',
+            {'token': self.token}, format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data['removed'])
+        self.assertFalse(DeviceToken.objects.filter(token=self.token).exists())
+
+    def test_one_user_cannot_remove_another_users_device(self):
+        self.client.force_authenticate(user=self.parent)
+        self.client.post(
+            '/api/v1/notifications/register-device/',
+            {'token': self.token}, format='json',
+        )
+
+        self.client.force_authenticate(user=self.other_parent)
+        res = self.client.delete(
+            '/api/v1/notifications/register-device/',
+            {'token': self.token}, format='json',
+        )
+
+        self.assertFalse(res.data['removed'])
+        self.assertTrue(DeviceToken.objects.filter(token=self.token).exists())
+
+    def test_a_short_token_is_rejected(self):
+        self.client.force_authenticate(user=self.parent)
+        res = self.client.post(
+            '/api/v1/notifications/register-device/',
+            {'token': 'abc'}, format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unauthenticated_cannot_register(self):
+        res = self.client.post(
+            '/api/v1/notifications/register-device/',
+            {'token': self.token}, format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_response_reports_whether_push_is_configured(self):
+        """The app uses this to stay quiet about push it cannot deliver."""
+        self.client.force_authenticate(user=self.parent)
+        res = self.client.post(
+            '/api/v1/notifications/register-device/',
+            {'token': self.token}, format='json',
+        )
+        self.assertIn('push_enabled', res.data)
+        # Tests run with no service-account file configured.
+        self.assertFalse(res.data['push_enabled'])
+
+    def test_notifications_still_work_with_push_unconfigured(self):
+        """A missing Firebase file must never break the in-app notification."""
+        from apps.notifications.services import NotificationService
+
+        notification = Notification.objects.create(
+            recipient=self.parent,
+            notification_type=Notification.NotificationType.ANNOUNCEMENT,
+            title='Test', message='Body',
+        )
+        # Must not raise.
+        NotificationService._push([notification])
+        self.assertEqual(self.parent.notifications.count(), 1)

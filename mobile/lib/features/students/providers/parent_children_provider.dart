@@ -20,8 +20,10 @@ class ParentChildrenNotifier extends StateNotifier<AsyncValue<List<StudentModel>
       final List<dynamic> results =
           response.data is List ? response.data : (response.data['results'] ?? []);
       final children = results.map((item) => StudentModel.fromJson(item)).toList();
+      if (!mounted) return;
       state = AsyncValue.data(children);
     } catch (e, st) {
+      if (!mounted) return;
       state = AsyncValue.error(apiClient.handleError(e).message, st);
     }
   }

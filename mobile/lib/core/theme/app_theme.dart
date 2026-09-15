@@ -69,9 +69,38 @@ class AppTheme {
           side: const BorderSide(color: AppColors.border, width: 1),
         ),
       ),
+      // Material 3 tints dialog surfaces from the seed colour, which turned
+      // every dialog a washed-out lavender. Pin them to white and drop the
+      // tint so dialogs match the rest of the app.
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 8,
+        shadowColor: Colors.black26,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        titleTextStyle: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textPrimary,
+          letterSpacing: -0.3,
+        ),
+        contentTextStyle: const TextStyle(
+          fontSize: 13.5,
+          color: AppColors.textSecondary,
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surface,
+        fillColor: AppColors.background,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

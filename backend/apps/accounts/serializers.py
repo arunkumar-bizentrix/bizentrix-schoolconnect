@@ -65,6 +65,62 @@ class UserSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
+class StaffSummarySerializer(serializers.ModelSerializer):
+    """
+    User shape for the admin's people screens and pickers (assigning teachers
+    to a class, linking a parent to a student). Deliberately excludes anything
+    sensitive - no password data, no permission flags.
+
+    ``linked`` is what makes a row recognisable at a glance: a teacher's
+    classes, or a parent's children. Callers prefetch it.
+    """
+    full_name = serializers.SerializerMethodField()
+    linked = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'full_name', 'email', 'phone_number',
+            'role', 'is_active', 'linked',
+        ]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        name = f"{obj.first_name} {obj.last_name}".strip()
+        return name or obj.username
+
+    def get_linked(self, obj):
+        if obj.role == User.Role.TEACHER:
+            return [
+                f"{c.name} - {c.section}"
+                for c in obj.assigned_classes.all()
+                if c.is_active
+            ]
+        if obj.role == User.Role.PARENT:
+            return [
+                f"{s.first_name} {s.last_name}".strip()
+                for s in obj.children.all()
+                if s.is_active
+            ]
+        return []
+
+
+class StaffCreateSerializer(serializers.Serializer):
+    """Input for an admin creating a teacher or parent account."""
+    full_name = serializers.CharField(min_length=2, max_length=150)
+    phone_number = serializers.CharField(max_length=20)
+    email = serializers.EmailField(required=False, allow_blank=True, default='')
+    role = serializers.ChoiceField(choices=[User.Role.TEACHER, User.Role.PARENT])
+
+
+class StaffUpdateSerializer(serializers.Serializer):
+    """Partial edits an admin makes to an existing teacher or parent."""
+    full_name = serializers.CharField(min_length=2, max_length=150, required=False)
+    phone_number = serializers.CharField(max_length=20, required=False)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    is_active = serializers.BooleanField(required=False)
+
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(required=True)
     password = serializers.CharField(required=True, write_only=True)
@@ -353,7 +409,7 @@ class VerifyEmailOTPSerializer(serializers.Serializer):
 
 class RegisterSerializer(serializers.Serializer):
     """
-    Serializer for public Parent / Teacher registration.
+    Serializer for public parent registration.
     Associates the new user with Vivekananda School Bagalur by default.
     """
     full_name = serializers.CharField(required=True, min_length=2, max_length=150)
@@ -364,10 +420,17 @@ class RegisterSerializer(serializers.Serializer):
     school_id = serializers.IntegerField(required=False, allow_null=True)
 
     def validate_role(self, value):
+        # Staff accounts come from the school admin, never from a public
+        # sign-up form: anyone can install the app, and a self-made teacher
+        # account would be one class assignment away from seeing children's
+        # records.
         normalized = str(value).upper().strip()
-        if normalized not in [User.Role.PARENT, User.Role.TEACHER]:
-            return User.Role.PARENT
-        return normalized
+        if normalized in (User.Role.TEACHER, User.Role.ADMIN):
+            raise serializers.ValidationError(
+                "Teacher accounts are created by the school admin. "
+                "Please ask the school office for your login."
+            )
+        return User.Role.PARENT
 
     def validate_email(self, value):
         if value:

@@ -1,17 +1,22 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../announcements/providers/announcements_provider.dart';
-import '../providers/auth_provider.dart';
 import '../../classes/providers/classes_provider.dart';
 import '../../homework/providers/homework_provider.dart';
 import '../../students/providers/students_provider.dart';
+import '../providers/auth_provider.dart';
 
-enum AuthMethod { whatsappOtp, password, emailOtp }
+/// Two ways in. Email OTP was removed: parents at this school use WhatsApp,
+/// not email, and running two OTP systems doubled the code and the failure
+/// modes for no benefit.
+enum AuthMethod { password, whatsappOtp }
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -21,28 +26,19 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  // Method toggle - WhatsApp OTP vs Password vs Email OTP
-  AuthMethod _authMethod = AuthMethod.whatsappOtp;
+  AuthMethod _authMethod = AuthMethod.password;
 
-  // WhatsApp OTP fields
   final _phoneController = TextEditingController();
   final _whatsappOtpController = TextEditingController();
   bool _whatsappOtpSent = false;
 
-  // Password fields
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  // Email OTP fields
-  final _emailController = TextEditingController();
-  final _emailOtpController = TextEditingController();
-  bool _emailOtpSent = false;
-
-  // Timer fields
   Timer? _countdownTimer;
-  int _remainingSeconds = 300; // 5 minutes validity
-  int _cooldownSeconds = 60; // 60 seconds resend cooldown
+  int _remainingSeconds = 300;
+  int _cooldownSeconds = 60;
   bool _canResend = false;
 
   @override
@@ -62,10 +58,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _whatsappOtpController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
-    _emailController.dispose();
-    _emailOtpController.dispose();
     super.dispose();
   }
+
+  // ───────────────────────────── timers ─────────────────────────────
 
   void _startTimers() {
     _countdownTimer?.cancel();
@@ -79,17 +75,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return;
       }
       setState(() {
-        if (_remainingSeconds > 0) {
-          _remainingSeconds--;
-        }
+        if (_remainingSeconds > 0) _remainingSeconds--;
         if (_cooldownSeconds > 0) {
           _cooldownSeconds--;
         } else {
           _canResend = true;
         }
-        if (_remainingSeconds <= 0 && _cooldownSeconds <= 0) {
-          timer.cancel();
-        }
+        if (_remainingSeconds <= 0 && _cooldownSeconds <= 0) timer.cancel();
       });
     });
   }
@@ -98,9 +90,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _countdownTimer?.cancel();
     setState(() {
       _whatsappOtpSent = false;
-      _emailOtpSent = false;
       _whatsappOtpController.clear();
-      _emailOtpController.clear();
       _remainingSeconds = 300;
       _cooldownSeconds = 60;
       _canResend = false;
@@ -113,377 +103,110 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return '$minutes:$seconds';
   }
 
-  // ═══════════════════════════════════════════════════════
-  // WHATSAPP OTP ACTIONS
-  // ═══════════════════════════════════════════════════════
-  void _handleSendWhatsAppOtp() async {
+  // ───────────────────────────── feedback ─────────────────────────────
+
+  void _toast(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor:
+            error ? AppColors.priorityUrgentText : AppColors.statusActiveText,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  void _goToDashboard() {
+    ref.read(classesProvider.notifier).refresh();
+    ref.read(studentsProvider.notifier).refresh();
+    ref.read(homeworkProvider.notifier).refresh();
+    ref.read(announcementsProvider.notifier).refresh();
+    context.go('/dashboard');
+  }
+
+  // ───────────────────────────── actions ─────────────────────────────
+
+  Future<void> _handlePasswordLogin() async {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (username.isEmpty || password.isEmpty) {
+      _toast('Enter your mobile number and password.', error: true);
+      return;
+    }
+
+    final success =
+        await ref.read(authProvider.notifier).login(username, password);
+    if (!mounted) return;
+
+    if (success) {
+      _goToDashboard();
+    } else {
+      _toast(
+        ref.read(authProvider).errorMessage ??
+            'Login failed. Please check your credentials.',
+        error: true,
+      );
+    }
+  }
+
+  Future<void> _handleSendWhatsAppOtp() async {
     final phone = _phoneController.text.trim().replaceAll(RegExp(r'[^0-9]'), '');
     if (phone.length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid 10-digit mobile number.'),
-          backgroundColor: AppColors.priorityUrgentText,
-        ),
-      );
+      _toast('Enter a valid 10-digit mobile number.', error: true);
       return;
     }
 
     final result = await ref.read(authProvider.notifier).sendWhatsAppOtp(phone);
     if (!mounted) return;
 
-    if (result['success'] == true || result['message'] != null || result['status'] == 'success') {
-      setState(() {
-        _whatsappOtpSent = true;
-      });
+    final ok = result['success'] == true ||
+        result['message'] != null ||
+        result['status'] == 'success';
+
+    if (ok) {
+      setState(() => _whatsappOtpSent = true);
       _startTimers();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message']?.toString() ?? 'OTP sent to your WhatsApp successfully! 💬'),
-          backgroundColor: const Color(0xFF059669),
-        ),
-      );
+      _toast(result['message']?.toString() ?? 'Code sent on WhatsApp.');
     } else {
-      final rawError = result['detail']?.toString() ??
-          result['error']?.toString() ??
-          ref.read(authProvider).errorMessage ??
-          'Failed to send WhatsApp OTP. Please try again.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(rawError), backgroundColor: AppColors.priorityUrgentText),
+      _toast(
+        result['detail']?.toString() ??
+            result['error']?.toString() ??
+            ref.read(authProvider).errorMessage ??
+            'Could not send the code. Please try again.',
+        error: true,
       );
     }
   }
 
-  void _handleVerifyWhatsAppOtp() async {
+  Future<void> _handleVerifyWhatsAppOtp() async {
     final phone = _phoneController.text.trim().replaceAll(RegExp(r'[^0-9]'), '');
     final otp = _whatsappOtpController.text.trim();
 
-    if (otp.length != 6 || !RegExp(r'^\d{6}$').hasMatch(otp)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the 6-digit OTP received on WhatsApp.'),
-          backgroundColor: AppColors.priorityUrgentText,
-        ),
-      );
+    if (otp.length != 6) {
+      _toast('Enter the 6-digit code from WhatsApp.', error: true);
       return;
     }
 
-    final success = await ref.read(authProvider.notifier).verifyWhatsAppOtp(phone, otp);
+    final success =
+        await ref.read(authProvider.notifier).verifyWhatsAppOtp(phone, otp);
     if (!mounted) return;
 
     if (success) {
       _countdownTimer?.cancel();
-      ref.read(classesProvider.notifier).refresh();
-      ref.read(studentsProvider.notifier).refresh();
-      ref.read(homeworkProvider.notifier).refresh();
-      ref.read(announcementsProvider.notifier).refresh();
-      context.go('/dashboard');
+      _goToDashboard();
     } else {
-      final rawError = ref.read(authProvider).errorMessage ?? 'Incorrect OTP. Please try again.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(rawError), backgroundColor: AppColors.priorityUrgentText),
+      _toast(
+        ref.read(authProvider).errorMessage ?? 'Incorrect code. Try again.',
+        error: true,
       );
     }
   }
 
-  // ═══════════════════════════════════════════════════════
-  // PASSWORD ACTIONS
-  // ═══════════════════════════════════════════════════════
-  void _handlePasswordLogin() async {
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text.trim();
-
-    if (username.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your username and password')),
-      );
-      return;
-    }
-
-    final success = await ref.read(authProvider.notifier).login(username, password);
-    if (!mounted) return;
-
-    if (success) {
-      ref.read(classesProvider.notifier).refresh();
-      ref.read(studentsProvider.notifier).refresh();
-      ref.read(homeworkProvider.notifier).refresh();
-      ref.read(announcementsProvider.notifier).refresh();
-      context.go('/dashboard');
-    } else {
-      final error = ref.read(authProvider).errorMessage ?? 'Login failed. Please check credentials.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: AppColors.priorityUrgentText),
-      );
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════
-  // EMAIL OTP ACTIONS
-  // ═══════════════════════════════════════════════════════
-  void _handleSendEmailOtp() async {
-    final email = _emailController.text.trim().toLowerCase();
-    if (email.isEmpty || !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid email address.'),
-          backgroundColor: AppColors.priorityUrgentText,
-        ),
-      );
-      return;
-    }
-
-    final result = await ref.read(authProvider.notifier).sendEmailOtp(email);
-    if (!mounted) return;
-
-    if (result['detail'] != null || result['success'] == true) {
-      setState(() {
-        _emailOtpSent = true;
-      });
-      _startTimers();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['detail']?.toString() ?? 'OTP sent to your email address.'),
-          backgroundColor: const Color(0xFF059669),
-        ),
-      );
-    } else {
-      final rawError = result['error']?.toString() ??
-          ref.read(authProvider).errorMessage ??
-          'Failed to send OTP. Please try again.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(rawError), backgroundColor: AppColors.priorityUrgentText),
-      );
-    }
-  }
-
-  void _handleVerifyEmailOtp() async {
-    final email = _emailController.text.trim().toLowerCase();
-    final otp = _emailOtpController.text.trim();
-
-    if (otp.length != 6 || !RegExp(r'^\d{6}$').hasMatch(otp)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the 6-digit OTP received in your email.'),
-          backgroundColor: AppColors.priorityUrgentText,
-        ),
-      );
-      return;
-    }
-
-    final success = await ref.read(authProvider.notifier).verifyEmailOtp(email, otp);
-    if (!mounted) return;
-
-    if (success) {
-      _countdownTimer?.cancel();
-      ref.read(classesProvider.notifier).refresh();
-      ref.read(studentsProvider.notifier).refresh();
-      ref.read(homeworkProvider.notifier).refresh();
-      ref.read(announcementsProvider.notifier).refresh();
-      context.go('/dashboard');
-    } else {
-      final rawError = ref.read(authProvider).errorMessage ?? 'Incorrect OTP. Please try again.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(rawError), backgroundColor: AppColors.priorityUrgentText),
-      );
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════
-  // REGISTRATION DIALOG
-  // ═══════════════════════════════════════════════════════
-  void _showRegistrationDialog(BuildContext context) {
-    final firstCtrl = TextEditingController();
-    final lastCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController(text: _phoneController.text);
-    final emailCtrl = TextEditingController();
-    String selectedRole = 'Teacher';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Container(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Row(
-                  children: [
-                    Icon(Icons.person_add_alt_1_rounded, color: AppColors.primary, size: 24),
-                    SizedBox(width: 8),
-                    Text(
-                      'Create School Account',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Register as a Teacher or Parent under Bizentrix SchoolConnect.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 16),
-
-                // First & Last Name
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: firstCtrl,
-                        decoration: InputDecoration(
-                          labelText: 'First Name',
-                          hintText: 'First name',
-                          filled: true,
-                          fillColor: AppColors.background,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: lastCtrl,
-                        decoration: InputDecoration(
-                          labelText: 'Last Name',
-                          hintText: 'Last name',
-                          filled: true,
-                          fillColor: AppColors.background,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Phone
-                TextField(
-                  controller: phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: 'WhatsApp Mobile Number',
-                    prefixText: '+91 ',
-                    filled: true,
-                    fillColor: AppColors.background,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Email
-                TextField(
-                  controller: emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: 'Email Address (Optional)',
-                    hintText: 'name@school.edu',
-                    filled: true,
-                    fillColor: AppColors.background,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Role Selector
-                const Text(
-                  'Select Your Role:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: ['Teacher', 'Parent', 'Admin'].map((role) {
-                    final isSel = selectedRole == role;
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () => setModalState(() => selectedRole = role),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isSel ? AppColors.primary : AppColors.background,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: isSel ? AppColors.primary : AppColors.border),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            role,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: isSel ? Colors.white : AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 20),
-
-                // Submit Button
-                SizedBox(
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      final first = firstCtrl.text.trim();
-                      final phone = phoneCtrl.text.trim().replaceAll(RegExp(r'[^0-9]'), '');
-                      if (first.isEmpty || phone.length < 10) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please enter your first name and a valid 10-digit mobile number.'),
-                            backgroundColor: AppColors.priorityUrgentText,
-                          ),
-                        );
-                        return;
-                      }
-                      Navigator.pop(ctx);
-                      setState(() {
-                        _phoneController.text = phone;
-                        _authMethod = AuthMethod.whatsappOtp;
-                      });
-                      _handleSendWhatsAppOtp();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text('Register & Send OTP', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // ───────────────────────────── layout ─────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -491,241 +214,184 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      // One scroll view for band + form, so the keyboard simply pushes the
+      // whole screen up instead of squeezing the fields.
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 24),
-
-                    // Brand Emblem / Official School Logo
-                    Center(
-                      child: Container(
-                        width: 72,
-                        height: 72,
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: AppColors.border, width: 1.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.15),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.asset(
-                            AppConstants.schoolLogoPath,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.school_rounded,
-                              size: 34,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // App Title & Tagline
-                    const Text(
-                      AppConstants.schoolName,
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    const Text(
-                      '${AppConstants.schoolBranch} • ${AppConstants.schoolEstablished}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      AppConstants.schoolTagline,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textMuted,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-
-                    // Welcome Card
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.border),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Text(
-                            'Welcome Back',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Sign in to your school account',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // 3-Way Auth Mode Toggle
-                          _buildAuthModeSwitcher(),
-                          const SizedBox(height: 18),
-
-                          // Active Flow (WhatsApp OTP vs Password vs Email OTP)
-                          if (_authMethod == AuthMethod.whatsappOtp)
-                            _buildWhatsAppOtpForm(authState)
-                          else if (_authMethod == AuthMethod.password)
-                            _buildPasswordForm(authState)
-                          else
-                            _buildEmailOtpForm(authState),
-
-                          const SizedBox(height: 16),
-
-                          // Register Link
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
-                                "Don't have an account? ",
-                                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                              ),
-                              GestureDetector(
-                                onTap: () => _showRegistrationDialog(context),
-                                child: const Text(
-                                  'Register Now',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-            ),
-
-            // Bottom School Building Graphic
-            _buildSchoolIllustration(),
-          ],
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _brandCap(context),
+              _formBody(authState),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // ═══════════════════════════════════════════════════════
-  // 3-WAY SEGMENTED SWITCHER (WHATSAPP vs PASSWORD vs EMAIL)
-  // ═══════════════════════════════════════════════════════
-  Widget _buildAuthModeSwitcher() {
+  /// Solid school-blue band, curved where it meets the form. No photograph:
+  /// flat brand colour holds up on a cheap phone screen in daylight, which a
+  /// darkened photo does not.
+  Widget _brandCap(BuildContext context) {
+    final topInset = MediaQuery.of(context).padding.top;
+
     return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+      padding: EdgeInsets.fromLTRB(24, topInset + 34, 24, 34),
+      decoration: const BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
       ),
-      child: Row(
+      child: Column(
         children: [
-          // WhatsApp OTP Tab
-          _buildSegmentTab(
-            method: AuthMethod.whatsappOtp,
-            title: 'WhatsApp',
-            icon: Icons.chat_bubble_rounded,
-            activeColor: const Color(0xFF25D366),
+          Container(
+            width: 58,
+            height: 58,
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(17),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryDark.withValues(alpha: 0.32),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: Image.asset(
+                AppConstants.schoolLogoPath,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.school_rounded,
+                  size: 28,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
           ),
-          const SizedBox(width: 4),
-
-          // Password Tab
-          _buildSegmentTab(
-            method: AuthMethod.password,
-            title: 'Password',
-            icon: Icons.lock_outline_rounded,
-            activeColor: AppColors.primary,
+          const SizedBox(height: 14),
+          const Text(
+            AppConstants.schoolName,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.5,
+              height: 1.15,
+            ),
           ),
-          const SizedBox(width: 4),
-
-          // Email OTP Tab
-          _buildSegmentTab(
-            method: AuthMethod.emailOtp,
-            title: 'Email',
-            icon: Icons.mark_email_read_outlined,
-            activeColor: AppColors.primary,
+          const SizedBox(height: 6),
+          const Text(
+            '${AppConstants.schoolBranch} • SINCE 1999',
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFC3D7FB),
+              letterSpacing: 1.1,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSegmentTab({
-    required AuthMethod method,
-    required String title,
+  Widget _formBody(AuthState authState) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            _whatsappOtpSent ? 'Verify your number' : 'Welcome back',
+            style: const TextStyle(
+              fontSize: 23,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            _whatsappOtpSent
+                ? 'Enter the 6-digit code we sent on WhatsApp'
+                : 'Sign in to continue to your school account',
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 20),
+          if (!_whatsappOtpSent) ...[
+            _methodSwitcher(),
+            const SizedBox(height: 20),
+          ],
+          if (_whatsappOtpSent)
+            _otpStep(authState)
+          else if (_authMethod == AuthMethod.password)
+            _passwordStep(authState)
+          else
+            _phoneStep(authState),
+          const SizedBox(height: 18),
+          _registerLink(),
+        ],
+      ),
+    );
+  }
+
+  /// Two-option segmented control: one control, not three loose buttons.
+  Widget _methodSwitcher() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          _switcherTab(
+            label: 'Password',
+            icon: Icons.lock_outline_rounded,
+            method: AuthMethod.password,
+          ),
+          _switcherTab(
+            label: 'WhatsApp',
+            icon: Icons.chat_bubble_outline_rounded,
+            method: AuthMethod.whatsappOtp,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _switcherTab({
+    required String label,
     required IconData icon,
-    required Color activeColor,
+    required AuthMethod method,
   }) {
-    final isSelected = _authMethod == method;
+    final selected = _authMethod == method;
     return Expanded(
       child: GestureDetector(
-        onTap: () {
-          if (_authMethod != method) {
-            _resetOtpFlow();
-            setState(() => _authMethod = method);
-          }
-        },
+        onTap: () => setState(() => _authMethod = method),
+        behavior: HitTestBehavior.opaque,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(vertical: 11),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: isSelected
+            color: selected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(11),
+            boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 4,
+                      color: Colors.black.withValues(alpha: 0.07),
+                      blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
                   ]
@@ -736,16 +402,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             children: [
               Icon(
                 icon,
-                size: 15,
-                color: isSelected ? activeColor : AppColors.textMuted,
+                size: 16,
+                color: selected ? AppColors.primary : AppColors.textMuted,
               ),
-              const SizedBox(width: 5),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? activeColor : AppColors.textSecondary,
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color:
+                        selected ? AppColors.primary : AppColors.textSecondary,
+                  ),
                 ),
               ),
             ],
@@ -755,583 +426,580 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════
-  // WHATSAPP OTP FORM
-  // ═══════════════════════════════════════════════════════
-  Widget _buildWhatsAppOtpForm(AuthState authState) {
-    if (!_whatsappOtpSent) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'WhatsApp Mobile Number',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
+  // ───────────────────────────── steps ─────────────────────────────
 
-          // Phone input with +91 prefix
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                  decoration: const BoxDecoration(
-                    color: AppColors.surfaceElevated,
-                    borderRadius: BorderRadius.horizontal(left: Radius.circular(11)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Text('🇮🇳', style: TextStyle(fontSize: 16)),
-                      SizedBox(width: 4),
-                      Text(
-                        '+91',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
-                    ],
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1),
-                    decoration: const InputDecoration(
-                      hintText: 'Enter 10-digit number',
-                      hintStyle: TextStyle(color: AppColors.textMuted, letterSpacing: 0),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-
-          // Send WhatsApp OTP Button
-          SizedBox(
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: authState.isLoading ? null : _handleSendWhatsAppOtp,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF25D366),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: authState.isLoading
-                  ? const SizedBox.shrink()
-                  : const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-              label: authState.isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text(
-                      'Send OTP via WhatsApp',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          const Center(
-            child: Text(
-              'A 6-digit verification code will be sent via Meta WhatsApp Cloud API.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
-            ),
-          ),
-        ],
-      );
-    } else {
-      // Step 2: Verify WhatsApp OTP
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFA5D6A7)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.mark_chat_read_rounded, size: 18, color: Color(0xFF2E7D32)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'OTP sent to +91 ${_phoneController.text}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1B5E20),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: _resetOtpFlow,
-                  child: const Text(
-                    'Change',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2E7D32),
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          const Text(
-            'Enter 6-Digit WhatsApp Code',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-
-          // 6-digit OTP Input
-          TextField(
-            controller: _whatsappOtpController,
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(6),
-            ],
-            style: const TextStyle(
-              fontSize: 24,
-              letterSpacing: 10,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-            decoration: InputDecoration(
-              hintText: '••••••',
-              hintStyle: const TextStyle(letterSpacing: 10, color: AppColors.textMuted),
-              filled: true,
-              fillColor: AppColors.background,
-              contentPadding: const EdgeInsets.symmetric(vertical: 14),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF25D366), width: 1.5),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Timers & Resend
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.timer_outlined, size: 14, color: AppColors.textMuted),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Expires in: ${_formatTimer(_remainingSeconds)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: _remainingSeconds <= 60 ? Colors.red : AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-              if (_canResend)
-                GestureDetector(
-                  onTap: authState.isLoading ? null : _handleSendWhatsAppOtp,
-                  child: const Text(
-                    'Resend OTP',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF25D366),
-                    ),
-                  ),
-                )
-              else
-                Text(
-                  'Resend in ${_cooldownSeconds}s',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Verify Button
-          SizedBox(
-            height: 48,
-            child: ElevatedButton(
-              onPressed: authState.isLoading ? null : _handleVerifyWhatsAppOtp,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF25D366),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: authState.isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text(
-                      'Verify & Login',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                    ),
-            ),
-          ),
-        ],
-      );
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════
-  // PASSWORD LOGIN FORM
-  // ═══════════════════════════════════════════════════════
-  Widget _buildPasswordForm(AuthState authState) {
+  Widget _passwordStep(AuthState authState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Username',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 6),
+        _fieldLabel('Mobile number or username'),
         TextField(
           controller: _usernameController,
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.person_outline, size: 20, color: AppColors.textMuted),
-            hintText: 'Enter username',
-            filled: true,
-            fillColor: AppColors.background,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+          textInputAction: TextInputAction.next,
+          keyboardType: TextInputType.visiblePassword,
+          autocorrect: false,
+          decoration: _fieldDecoration(
+            hint: 'e.g. 98765 43210',
+            icon: Icons.person_outline_rounded,
           ),
         ),
         const SizedBox(height: 14),
-
-        const Text(
-          'Password',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 6),
+        _fieldLabel('Password'),
         TextField(
           controller: _passwordController,
           obscureText: _obscurePassword,
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.lock_outline, size: 20, color: AppColors.textMuted),
-            suffixIcon: IconButton(
-              icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20, color: AppColors.textMuted),
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _handlePasswordLogin(),
+          decoration: _fieldDecoration(
+            hint: 'Your password',
+            icon: Icons.lock_outline_rounded,
+            suffix: IconButton(
+              icon: Icon(
+                _obscurePassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                size: 19,
+                color: AppColors.textMuted,
+              ),
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
             ),
-            hintText: 'Enter password',
-            filled: true,
-            fillColor: AppColors.background,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
           ),
         ),
-        const SizedBox(height: 18),
-
-        SizedBox(
-          height: 48,
-          child: ElevatedButton(
-            onPressed: authState.isLoading ? null : _handlePasswordLogin,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: authState.isLoading
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Login', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        Center(
-          child: TextButton(
-            onPressed: () {},
-            child: const Text('Forgot Password?', style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w500)),
-          ),
+        const SizedBox(height: 20),
+        _primaryButton(
+          label: 'Sign in',
+          loading: authState.isLoading,
+          onPressed: _handlePasswordLogin,
         ),
       ],
     );
   }
 
-  // ═══════════════════════════════════════════════════════
-  // EMAIL OTP FORM
-  // ═══════════════════════════════════════════════════════
-  Widget _buildEmailOtpForm(AuthState authState) {
-    if (!_emailOtpSent) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Email Address',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+  Widget _phoneStep(AuthState authState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _fieldLabel('WhatsApp number'),
+        TextField(
+          controller: _phoneController,
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _handleSendWhatsAppOtp(),
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(10),
+          ],
+          decoration: _fieldDecoration(
+            hint: '10-digit mobile number',
+            icon: Icons.phone_iphone_rounded,
+            prefixText: '+91 ',
           ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.email_outlined, size: 20, color: AppColors.textMuted),
-              hintText: 'Enter your registered email',
-              filled: true,
-              fillColor: AppColors.background,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
-            ),
-          ),
-          const SizedBox(height: 18),
-
-          SizedBox(
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: authState.isLoading ? null : _handleSendEmailOtp,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              icon: authState.isLoading ? const SizedBox.shrink() : const Icon(Icons.send_rounded, size: 18),
-              label: authState.isLoading
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Send Email OTP', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
-      );
-    } else {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.mark_email_read_rounded, size: 18, color: Color(0xFF1D4ED8)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'OTP sent to ${_emailController.text}',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: _resetOtpFlow,
-                  child: const Text(
-                    'Change',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary, decoration: TextDecoration.underline),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          const Text('Enter 6-Digit Code', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-          const SizedBox(height: 6),
-
-          TextField(
-            controller: _emailOtpController,
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
-            style: const TextStyle(fontSize: 24, letterSpacing: 10, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              hintText: '••••••',
-              hintStyle: const TextStyle(letterSpacing: 10, color: AppColors.textMuted),
-              filled: true,
-              fillColor: AppColors.background,
-              contentPadding: const EdgeInsets.symmetric(vertical: 14),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.timer_outlined, size: 14, color: AppColors.textMuted),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Expires in: ${_formatTimer(_remainingSeconds)}',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _remainingSeconds <= 60 ? Colors.red : AppColors.textSecondary),
-                  ),
-                ],
-              ),
-              if (_canResend)
-                GestureDetector(
-                  onTap: authState.isLoading ? null : _handleSendEmailOtp,
-                  child: const Text('Resend OTP', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                )
-              else
-                Text('Resend in ${_cooldownSeconds}s', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          SizedBox(
-            height: 48,
-            child: ElevatedButton(
-              onPressed: authState.isLoading ? null : _handleVerifyEmailOtp,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: authState.isLoading
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Verify & Sign In', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
-      );
-    }
+        ),
+        const SizedBox(height: 20),
+        _primaryButton(
+          label: 'Send code on WhatsApp',
+          loading: authState.isLoading,
+          onPressed: _handleSendWhatsAppOtp,
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'We will send a 6-digit code to this number.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+        ),
+      ],
+    );
   }
 
-  Widget _buildSchoolIllustration() {
-    return Container(
-      width: double.infinity,
-      height: 110,
-      margin: const EdgeInsets.only(top: 8),
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
+  Widget _otpStep(AuthState authState) {
+    final expired = _remainingSeconds <= 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: AppColors.statStudentsBg,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.mark_chat_read_rounded,
+                  size: 18, color: AppColors.statStudentsText),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '+91 ${_phoneController.text}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.statStudentsText,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: _resetOtpFlow,
+                child: const Text(
+                  'Change',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.statStudentsText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        TextField(
+          controller: _whatsappOtpController,
+          textAlign: TextAlign.center,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _handleVerifyWhatsAppOtp(),
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(6),
+          ],
+          style: const TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 12,
+            color: AppColors.textPrimary,
+          ),
+          decoration: InputDecoration(
+            hintText: '000000',
+            hintStyle: const TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 12,
+              color: AppColors.border,
+            ),
+            filled: true,
+            fillColor: AppColors.surfaceElevated,
+            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: AppColors.primary, width: 1.6),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(
+                expired
+                    ? 'Code expired'
+                    : 'Expires in ${_formatTimer(_remainingSeconds)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: expired ? AppColors.error : AppColors.textSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: GestureDetector(
+                onTap: _canResend ? _handleSendWhatsAppOtp : null,
+                child: Text(
+                  _canResend ? 'Resend code' : 'Resend in ${_cooldownSeconds}s',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _canResend ? AppColors.primary : AppColors.textMuted,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _primaryButton(
+          label: 'Verify and sign in',
+          loading: authState.isLoading,
+          onPressed: _handleVerifyWhatsAppOtp,
+        ),
+      ],
+    );
+  }
+
+  Widget _registerLink() {
+    return Center(
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const Text(
+            "Don't have an account? ",
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          GestureDetector(
+            onTap: () => _showRegistrationSheet(context),
+            child: const Text(
+              'Create one',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ───────────────────────────── shared bits ─────────────────────────────
+
+  Widget _fieldLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textSecondary,
+          letterSpacing: 0.1,
         ),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            'assets/images/school_campus.jpg',
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: const Color(0xFF1E293B),
-              child: const Center(
-                child: Icon(Icons.school, size: 36, color: Colors.white54),
+    );
+  }
+
+  InputDecoration _fieldDecoration({
+    required String hint,
+    required IconData icon,
+    Widget? suffix,
+    String? prefixText,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(fontSize: 13.5, color: AppColors.textMuted),
+      prefixIcon: Icon(icon, size: 19, color: AppColors.textMuted),
+      prefixText: prefixText,
+      prefixStyle: const TextStyle(
+        fontSize: 14.5,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      ),
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: AppColors.background,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.6),
+      ),
+    );
+  }
+
+  Widget _primaryButton({
+    required String label,
+    required bool loading,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      height: 52,
+      child: ElevatedButton(
+        onPressed: loading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+          disabledForegroundColor: Colors.white70,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        child: loading
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.2, color: Colors.white),
+              )
+            : Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.1,
+                ),
               ),
-            ),
+      ),
+    );
+  }
+
+  // ───────────────────────────── registration ─────────────────────────────
+
+  /// Creates a real account through POST /auth/register/ and signs the user
+  /// straight in. The previous sheet collected a name, email and role and then
+  /// threw them away, sending only an OTP.
+  void _showRegistrationSheet(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController(text: _phoneController.text);
+    final emailCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    bool obscure = true;
+    bool submitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setSheetState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
           ),
-          // Subtle gradient overlay
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.white.withValues(alpha: 0.1),
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.65),
-                ],
-              ),
-            ),
+          padding: EdgeInsets.fromLTRB(
+            22,
+            14,
+            22,
+            MediaQuery.of(sheetCtx).viewInsets.bottom + 22,
           ),
-          // Clean campus badge
-          Positioned(
-            bottom: 8,
-            left: 14,
-            right: 14,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Center(
+                  child: Container(
+                    width: 46,
+                    height: 46,
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.person_add_alt_1_rounded,
+                        color: Colors.white, size: 22),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Create your account',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'For parents of ${AppConstants.schoolFullName}',
+                  textAlign: TextAlign.center,
+                  style:
+                      TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 20),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.white24, width: 0.5),
+                    color: AppColors.statClassesBg,
+                    borderRadius: BorderRadius.circular(13),
                   ),
                   child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.verified, color: Color(0xFF38BDF8), size: 12),
-                      SizedBox(width: 4),
-                      Text(
-                        '${AppConstants.schoolName} • ${AppConstants.schoolBranch}',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
+                      Icon(Icons.info_outline_rounded,
+                          size: 18, color: AppColors.statClassesText),
+                      SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          'This is for parents. Teachers: your login is created by '
+                          'the school office - ask them for your password.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            height: 1.4,
+                            color: AppColors.statClassesText,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Text(
-                  'Academic Session ${AppConstants.currentAcademicYear}',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
+                const SizedBox(height: 16),
+                _fieldLabel('Full name'),
+                TextField(
+                  controller: nameCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _fieldDecoration(
+                    hint: 'e.g. Ravi Kumar',
+                    icon: Icons.badge_outlined,
                   ),
+                ),
+                const SizedBox(height: 14),
+                _fieldLabel('Mobile number'),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  decoration: _fieldDecoration(
+                    hint: '10-digit mobile number',
+                    icon: Icons.phone_iphone_rounded,
+                    prefixText: '+91 ',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _fieldLabel('Email (optional)'),
+                TextField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: _fieldDecoration(
+                    hint: 'name@example.com',
+                    icon: Icons.alternate_email_rounded,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _fieldLabel('Password'),
+                TextField(
+                  controller: passCtrl,
+                  obscureText: obscure,
+                  decoration: _fieldDecoration(
+                    hint: 'At least 8 characters',
+                    icon: Icons.lock_outline_rounded,
+                    suffix: IconButton(
+                      icon: Icon(
+                        obscure
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 19,
+                        color: AppColors.textMuted,
+                      ),
+                      onPressed: () => setSheetState(() => obscure = !obscure),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: submitting
+                        ? null
+                        : () async {
+                            final name = nameCtrl.text.trim();
+                            final phone = phoneCtrl.text.trim();
+                            final pass = passCtrl.text;
+
+                            if (name.length < 2) {
+                              _toast('Enter your full name.', error: true);
+                              return;
+                            }
+                            if (phone.length < 10) {
+                              _toast('Enter a valid 10-digit mobile number.',
+                                  error: true);
+                              return;
+                            }
+                            if (pass.length < 8) {
+                              _toast('Password must be at least 8 characters.',
+                                  error: true);
+                              return;
+                            }
+
+                            setSheetState(() => submitting = true);
+                            final error = await ref
+                                .read(authProvider.notifier)
+                                .register(
+                                  fullName: name,
+                                  password: pass,
+                                  role: 'Parent',
+                                  email: emailCtrl.text.trim(),
+                                  phoneNumber: phone,
+                                );
+                            if (!sheetCtx.mounted) return;
+                            setSheetState(() => submitting = false);
+
+                            if (error == null) {
+                              Navigator.pop(sheetCtx);
+                              if (!mounted) return;
+                              _toast('Welcome to SchoolConnect!');
+                              _goToDashboard();
+                            } else {
+                              _toast(error, error: true);
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor:
+                          AppColors.primary.withValues(alpha: 0.5),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: submitting
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.2, color: Colors.white),
+                          )
+                        : const Text(
+                            'Create account',
+                            style: TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w700),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'An administrator will link your children to your account.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

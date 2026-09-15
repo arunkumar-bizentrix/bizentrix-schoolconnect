@@ -2,9 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../shared/widgets/load_more_footer.dart';
 import '../../../core/utils/role_access.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../classes/providers/classes_provider.dart';
+import '../../auth/providers/staff_provider.dart';
+import 'import_roll_sheet.dart';
+import '../../../shared/widgets/screen_header.dart';
 import '../providers/students_provider.dart';
 import '../models/student_model.dart';
 
@@ -79,25 +83,27 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Text(
-                isParent ? 'My Children' : 'Students',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                isParent
+              ScreenHeader(
+                title: isParent ? 'My Children' : 'Students',
+                subtitle: isParent
                     ? 'Your registered wards at SchoolConnect'
-                    : 'Manage your students',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
+                    : 'School student directory',
+                action: canManage
+                    ? OutlinedButton.icon(
+                        onPressed: () => ImportRollSheet.show(context),
+                        icon: const Icon(Icons.upload_file_outlined, size: 16),
+                        label: const Text('Import roll',
+                            style: TextStyle(fontSize: 12)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.border),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(height: 16),
 
@@ -203,7 +209,9 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                 ? 'Your registered wards will appear here.'
                                 : isAdmin
                                     ? 'Try changing filters or tap "+" to enroll students.'
-                                    : 'No students found in your assigned classes.',
+                                    : 'You see the students of the classes you '
+                                        'teach. If this is empty, the school '
+                                        'admin has not added you to a class yet.',
                             style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                             textAlign: TextAlign.center,
                           ),
@@ -256,6 +264,24 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                     ],
                   ),
                 ),
+              ),
+              // Paged list: the API returns 20 at a time, so the roll is
+              // only fully reachable through this.
+              Builder(
+                builder: (context) {
+                  final notifier = ref.read(studentsProvider.notifier);
+                  return LoadMoreFooter(
+                    loadedCount: studentsAsync.value?.length ?? 0,
+                    totalCount: notifier.totalCount,
+                    hasMore: notifier.hasMore,
+                    isLoading: notifier.isLoadingMore,
+                    noun: 'students',
+                    onLoadMore: () async {
+                      await notifier.loadMore();
+                      if (context.mounted) setState(() {});
+                    },
+                  );
+                },
               ),
             ],
           ),
@@ -378,13 +404,138 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
             ),
           ),
 
-          // Delete Action (Admin Only)
-          if (isAdmin)
+          // Admin-only actions
+          if (isAdmin) ...[
+            IconButton(
+              icon: Badge(
+                isLabelVisible: student.parentIds.isNotEmpty,
+                label: Text('${student.parentIds.length}'),
+                child: const Icon(Icons.family_restroom_rounded,
+                    size: 18, color: AppColors.primary),
+              ),
+              onPressed: () => _showParentLinkDialog(context, ref, student),
+              tooltip: 'Linked parents',
+            ),
             IconButton(
               icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.statusOverdueText),
               onPressed: () => _confirmDeleteStudent(context, ref, student),
               tooltip: 'Delete Student',
             ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Admin-only: shows which parents are linked to this student and lets the
+  /// admin link or unlink one. A parent only sees a child in their app once
+  /// this link exists, so this is the step that switches a family on.
+  void _showParentLinkDialog(BuildContext context, WidgetRef ref, StudentModel student) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Parents of ${student.fullName}',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Consumer(
+            builder: (context, innerRef, _) {
+              final parentsAsync = innerRef.watch(parentsProvider);
+              // Re-read the student so the list refreshes after link/unlink.
+              final current = innerRef
+                      .watch(studentsProvider)
+                      .value
+                      ?.firstWhere(
+                        (candidate) => candidate.id == student.id,
+                        orElse: () => student,
+                      ) ??
+                  student;
+
+              return parentsAsync.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+                ),
+                error: (err, _) => const Text(
+                  'Could not load parent accounts. Check your connection and '
+                  'try again.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                data: (parents) {
+                  if (parents.isEmpty) {
+                    return const Text(
+                      'No parent accounts yet. A parent must register in the '
+                      'app first, then you can link them here.',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    );
+                  }
+                  return ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 320),
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: parents.map((parent) {
+                        final linked = current.parentIds.contains(parent.id);
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            parent.fullName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          subtitle: Text(
+                            parent.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          trailing: TextButton(
+                            onPressed: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              final notifier = ref.read(studentsProvider.notifier);
+                              final error = linked
+                                  ? await notifier.unlinkParent(student.id, parent.id)
+                                  : await notifier.linkParent(student.id, parent.id);
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(error ??
+                                      (linked
+                                          ? '${parent.fullName} unlinked'
+                                          : '${parent.fullName} linked to ${student.fullName}')),
+                                  backgroundColor: error == null
+                                      ? AppColors.statusActiveText
+                                      : AppColors.statusOverdueText,
+                                ),
+                              );
+                            },
+                            child: Text(
+                              linked ? 'Unlink' : 'Link',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: linked
+                                    ? AppColors.statusOverdueText
+                                    : AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
         ],
       ),
     );

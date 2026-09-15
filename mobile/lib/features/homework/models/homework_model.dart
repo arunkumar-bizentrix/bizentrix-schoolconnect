@@ -1,4 +1,17 @@
+import 'package:flutter/material.dart';
+
 import '../../../core/constants/app_constants.dart';
+
+/// Parses the API's "HH:MM:SS" time string. Null when the teacher set no time.
+TimeOfDay? _parseTime(dynamic raw) {
+  if (raw == null) return null;
+  final parts = raw.toString().split(':');
+  if (parts.length < 2) return null;
+  final hour = int.tryParse(parts[0]);
+  final minute = int.tryParse(parts[1]);
+  if (hour == null || minute == null) return null;
+  return TimeOfDay(hour: hour, minute: minute);
+}
 
 class HomeworkModel {
   final int id;
@@ -12,6 +25,13 @@ class HomeworkModel {
   final String assignedByName;
   final DateTime assignedDate;
   final DateTime dueDate;
+
+  /// Optional clock deadline on the due date. Null means "due that day",
+  /// which is how homework worked before the field existed.
+  final TimeOfDay? dueTime;
+
+  /// Server-formatted deadline, e.g. "17 Sep 2026, 4:00 PM".
+  final String dueDisplay;
   final String? attachmentUrl;
   final String academicYear;
   final bool isActive;
@@ -28,12 +48,25 @@ class HomeworkModel {
     this.assignedByName = 'Faculty',
     required this.assignedDate,
     required this.dueDate,
+    this.dueTime,
+    this.dueDisplay = '',
     this.attachmentUrl,
     this.academicYear = AppConstants.currentAcademicYear,
     this.isActive = true,
   });
 
-  bool get isOverdue => dueDate.isBefore(DateTime.now());
+  /// The exact moment the homework is due: end of the due date unless the
+  /// teacher set a time.
+  DateTime get dueAt {
+    final time = dueTime;
+    if (time == null) {
+      return DateTime(dueDate.year, dueDate.month, dueDate.day, 23, 59, 59);
+    }
+    return DateTime(
+        dueDate.year, dueDate.month, dueDate.day, time.hour, time.minute);
+  }
+
+  bool get isOverdue => dueAt.isBefore(DateTime.now());
 
   factory HomeworkModel.fromJson(Map<String, dynamic> json) {
     int? cId;
@@ -66,6 +99,8 @@ class HomeworkModel {
       assignedByName: json['assigned_by_name'] ?? 'Faculty',
       assignedDate: DateTime.tryParse(json['assigned_date'] ?? '') ?? DateTime.now(),
       dueDate: DateTime.tryParse(json['due_date'] ?? '') ?? DateTime.now().add(const Duration(days: 2)),
+      dueTime: _parseTime(json['due_time']),
+      dueDisplay: (json['due_display'] ?? '').toString(),
       attachmentUrl: json['attachment'] ?? json['attachment_url'],
       academicYear: json['academic_year'] ?? AppConstants.currentAcademicYear,
       isActive: json['is_active'] ?? true,
@@ -82,6 +117,9 @@ class HomeworkModel {
       'description': description,
       'assigned_date': assignedDate.toIso8601String().split('T').first,
       'due_date': dueDate.toIso8601String().split('T').first,
+      if (dueTime != null)
+        'due_time':
+            '${dueTime!.hour.toString().padLeft(2, '0')}:${dueTime!.minute.toString().padLeft(2, '0')}',
       'attachment_url': attachmentUrl,
       'is_active': isActive,
     };

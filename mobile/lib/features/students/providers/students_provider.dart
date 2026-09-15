@@ -1,13 +1,53 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/page_result.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../models/student_model.dart';
 
 /// Student list state and admin-side student management.
 
 class StudentsNotifier extends StateNotifier<AsyncValue<List<StudentModel>>> {
+
+  // ── pagination ───────────────────────────────────────────────────────────
+  // The API pages at 20 rows. Without these the screen would show the first
+  // page of a 1000-row roll and look like the rest vanished.
+  String? _nextPageUrl;
+  bool _loadingMore = false;
+  int _totalCount = 0;
+
+  /// Rows on the server, including ones not loaded yet.
+  int get totalCount => _totalCount;
+
+  /// Whether another page is waiting.
+  bool get hasMore => _nextPageUrl != null;
+
+  /// Whether a `loadMore` call is in flight.
+  bool get isLoadingMore => _loadingMore;
+
+  /// Appends the next page to what is already on screen. Safe to call from a
+  /// scroll listener: it no-ops while one is in flight or when the list is
+  /// already complete.
+  Future<void> loadMore() async {
+    final url = _nextPageUrl;
+    if (url == null || _loadingMore) return;
+
+    _loadingMore = true;
+    try {
+      final response = await apiClient.dio.getUri(Uri.parse(url));
+      final page = PageResult.parse(response.data, StudentModel.fromJson);
+      _nextPageUrl = page.nextUrl;
+      _totalCount = page.totalCount;
+      if (!mounted) return;
+      state = AsyncValue.data([...?state.value, ...page.items]);
+    } catch (_) {
+      // Keep what is already displayed; the next scroll retries.
+    } finally {
+      _loadingMore = false;
+    }
+  }
   final ApiClient apiClient;
   String _currentAcademicYear = AppConstants.currentAcademicYear;
   int? _currentClassId;
@@ -43,11 +83,13 @@ class StudentsNotifier extends StateNotifier<AsyncValue<List<StudentModel>>> {
         queryParameters: queryParams,
       );
 
-      final List<dynamic> results =
-          response.data is List ? response.data : (response.data['results'] ?? []);
-      final students = results.map((item) => StudentModel.fromJson(item)).toList();
-      state = AsyncValue.data(students);
+      final page = PageResult.parse(response.data, StudentModel.fromJson);
+      _nextPageUrl = page.nextUrl;
+      _totalCount = page.totalCount;
+      if (!mounted) return;
+      state = AsyncValue.data(page.items);
     } catch (e, st) {
+      if (!mounted) return;
       state = AsyncValue.error(apiClient.handleError(e).message, st);
     }
   }
@@ -119,6 +161,69 @@ class StudentsNotifier extends StateNotifier<AsyncValue<List<StudentModel>>> {
       return 'Unexpected server response (${response.statusCode}).';
     } catch (e) {
       return apiClient.handleError(e).message;
+    }
+  }
+
+  /// Links a parent account to a student. Admin only on the backend.
+  /// Returns null on success, or the server's message on failure.
+  Future<String?> linkParent(int studentId, int parentId) async {
+    try {
+      final response = await apiClient.dio.post(
+        ApiEndpoints.studentLinkParent(studentId),
+        data: {'parent_id': parentId},
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await loadStudents();
+        return null;
+      }
+      return 'Unexpected server response (${response.statusCode}).';
+    } catch (e) {
+      return apiClient.handleError(e).message;
+    }
+  }
+
+  /// Removes a parent link. Returns null on success.
+  Future<String?> unlinkParent(int studentId, int parentId) async {
+    try {
+      final response = await apiClient.dio.post(
+        ApiEndpoints.studentUnlinkParent(studentId),
+        data: {'parent_id': parentId},
+      );
+      if (response.statusCode == 200) {
+        await loadStudents();
+        return null;
+      }
+      return 'Unexpected server response (${response.statusCode}).';
+    } catch (e) {
+      return apiClient.handleError(e).message;
+    }
+  }
+
+  /// Uploads a roll CSV. With [dryRun] the server validates and reports but
+  /// keeps nothing, so the admin can check the file before committing.
+  ///
+  /// Returns the server's summary, or throws the message to show the user.
+  Future<Map<String, dynamic>> importRoll({
+    required List<int> bytes,
+    required String filename,
+    required String academicYear,
+    bool dryRun = false,
+  }) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
+        'academic_year': academicYear,
+        'dry_run': dryRun.toString(),
+      });
+
+      final response = await apiClient.dio.post(
+        ApiEndpoints.studentImport,
+        data: formData,
+      );
+      if (!dryRun) await loadStudents();
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (e) {
+      throw apiClient.handleError(e).message;
     }
   }
 

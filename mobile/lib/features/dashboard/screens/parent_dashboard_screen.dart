@@ -6,8 +6,11 @@ import '../../announcements/providers/announcements_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../homework/providers/homework_provider.dart';
 import '../../notifications/providers/notifications_provider.dart';
+import '../../attendance/screens/attendance_summary_card.dart';
 import '../../students/providers/child_scope.dart';
 import '../../students/providers/parent_children_provider.dart';
+import '../../students/providers/parent_today_provider.dart';
+import '../../students/screens/child_today_card.dart';
 import '../../students/models/student_model.dart';
 import '../../homework/models/homework_model.dart';
 import '../../announcements/models/announcement_model.dart';
@@ -35,6 +38,7 @@ class ParentDashboardScreen extends ConsumerWidget {
         ref.read(homeworkProvider.notifier).refresh();
         ref.read(announcementsProvider.notifier).refresh();
         ref.read(notificationsProvider.notifier).refresh();
+        ref.invalidate(parentTodayProvider);
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -159,6 +163,48 @@ class ParentDashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
             ],
+
+            // ═══════════════════════════════════════════════
+            // TODAY - did they reach school, what is on, what came home
+            // ═══════════════════════════════════════════════
+            Consumer(
+              builder: (context, ref, _) {
+                final todayAsync = ref.watch(parentTodayProvider);
+                return todayAsync.when(
+                  loading: () => const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: LinearProgressIndicator(minHeight: 2),
+                  ),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (children) {
+                    final shown = selectedChild == null
+                        ? children
+                        : children.where((c) => c.studentId == selectedChild.id).toList();
+                    if (shown.isEmpty) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Today · ${DateFormat('EEEE, d MMM').format(DateTime.now())}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        for (final child in shown)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: ChildTodayCard(today: child),
+                          ),
+                        const SizedBox(height: 6),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
 
             // ═══════════════════════════════════════════════
             // MY CHILDREN SECTION
@@ -330,23 +376,33 @@ class ParentDashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
 
+            // Attendance for the selected child. Only shown once a child is
+            // picked - a combined percentage across siblings means nothing.
+            if (selectedChild != null) ...[
+              AttendanceSummaryCard(
+                studentId: selectedChild.id,
+                studentName: selectedChild.fullName,
+              ),
+              const SizedBox(height: 22),
+            ],
+
             // ═══════════════════════════════════════════════
             // ASSIGNED HOMEWORK PREVIEW
             // ═══════════════════════════════════════════════
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
-                  children: [
-                    Text(
-                      'Assigned Homework',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
+                const Expanded(
+                  child: Text(
+                    'Assigned Homework',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
                     ),
-                  ],
+                  ),
                 ),
                 TextButton(
                   onPressed: () {
@@ -404,12 +460,16 @@ class ParentDashboardScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'School Circulars & Notices',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                const Expanded(
+                  child: Text(
+                    'School Circulars & Notices',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
                 TextButton(
@@ -640,7 +700,9 @@ class ParentDashboardScreen extends ConsumerWidget {
 
   Widget _buildHomeworkCard(BuildContext context, HomeworkModel item, WidgetRef ref) {
     final isOverdue = item.isOverdue;
-    final dueDateFormatted = DateFormat('MMM d, yyyy').format(item.dueDate);
+    final dueDateFormatted = item.dueDisplay.isNotEmpty
+        ? item.dueDisplay
+        : DateFormat('MMM d, yyyy').format(item.dueDate);
 
     return InkWell(
       onTap: () {

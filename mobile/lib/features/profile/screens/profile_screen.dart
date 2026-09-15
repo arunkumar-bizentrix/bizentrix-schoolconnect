@@ -95,13 +95,17 @@ class ProfileScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                displayName,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.5,
+              Flexible(
+                child: Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.5,
+                  ),
                 ),
               ),
               const SizedBox(width: 4),
@@ -190,12 +194,16 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Institutional Identity',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                    const Flexible(
+                      child: Text(
+                        'Institutional Identity',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                   ],
@@ -239,12 +247,16 @@ class ProfileScreen extends ConsumerWidget {
                   children: [
                     Icon(Icons.badge_outlined, size: 20, color: AppColors.primary),
                     SizedBox(width: 8),
-                    Text(
-                      'Account Details',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                    Flexible(
+                      child: Text(
+                        'Account Details',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                   ],

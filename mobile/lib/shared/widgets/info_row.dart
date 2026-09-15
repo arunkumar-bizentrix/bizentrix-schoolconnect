@@ -32,12 +32,19 @@ class InfoRow extends StatelessWidget {
           style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
         const Spacer(),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: valueFontSize,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+        // A long value (school name, address, URL) shortens instead of
+        // pushing the row past its width.
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: valueFontSize,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
       ],

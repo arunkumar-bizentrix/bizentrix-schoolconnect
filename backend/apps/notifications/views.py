@@ -1,8 +1,11 @@
 from rest_framework import viewsets, permissions, status
+from rest_framework.views import APIView
+
+from . import push
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Notification
-from .serializers import NotificationSerializer
+from .models import DeviceToken, Notification
+from .serializers import DeviceTokenSerializer, NotificationSerializer
 
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -58,3 +61,56 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         """
         count = self.get_queryset().filter(is_read=False).count()
         return Response({'unread_count': count}, status=status.HTTP_200_OK)
+
+
+class DeviceRegistrationView(APIView):
+    """
+    POST   /api/v1/notifications/register-device/    body: {token, platform}
+    DELETE /api/v1/notifications/register-device/    body: {token}
+
+    The app registers its Firebase token after sign-in and removes it on sign
+    out - otherwise the next person to use that phone would receive the
+    previous user's notifications.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = DeviceTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        token = serializer.validated_data['token']
+
+        # A phone can change hands, so the row follows whoever signed in last
+        # rather than being duplicated per user.
+        device, created = DeviceToken.objects.update_or_create(
+            token=token,
+            defaults={
+                'user': request.user,
+                'platform': serializer.validated_data.get('platform', DeviceToken.Platform.ANDROID),
+                'device_name': serializer.validated_data.get('device_name', ''),
+                'is_active': True,
+            },
+        )
+
+        return Response(
+            {
+                'registered': True,
+                'created': created,
+                'push_enabled': push.is_configured(),
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    def delete(self, request):
+        token = (request.data.get('token') or '').strip()
+        if not token:
+            return Response(
+                {"detail": "token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Only ever removes the caller's own registration.
+        removed, _ = DeviceToken.objects.filter(
+            token=token, user=request.user
+        ).delete()
+        return Response({'removed': bool(removed)}, status=status.HTTP_200_OK)

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../shared/widgets/screen_header.dart';
+import '../../../shared/widgets/load_more_footer.dart';
 import '../../../shared/widgets/info_row.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -40,50 +42,28 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header Row with Add Homework Button (hidden for Parents)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Homework',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.5,
-                      ),
+          ScreenHeader(
+            title: 'Homework',
+            subtitle: 'Assignments and coursework',
+            action: isParent
+                ? null
+                : ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CreateHomeworkScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('New Homework', style: TextStyle(fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
                     ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Assignments and coursework',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              if (!isParent)
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CreateHomeworkScreen()),
-                    );
-                  },
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add Homework', style: TextStyle(fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    elevation: 0,
                   ),
-                ),
-            ],
           ),
           const SizedBox(height: 14),
 
@@ -118,7 +98,10 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
           const SizedBox(height: 14),
 
           // Filter Tabs (All, Upcoming, Overdue)
-          Row(
+          // Horizontally scrollable so the chips never overflow on small phones.
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
             children: _tabs.map((tab) {
               final isSelected = _selectedTab == tab;
               return Padding(
@@ -140,6 +123,7 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                 ),
               );
             }).toList(),
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -218,6 +202,25 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
               ),
             ),
           ),
+
+          // Paged list: the API returns 20 at a time, so the full set is only
+          // reachable through this.
+          Builder(
+            builder: (context) {
+              final notifier = ref.read(homeworkProvider.notifier);
+              return LoadMoreFooter(
+                loadedCount: homeworkAsync.value?.length ?? 0,
+                totalCount: notifier.totalCount,
+                hasMore: notifier.hasMore,
+                isLoading: notifier.isLoadingMore,
+                noun: 'homework items',
+                onLoadMore: () async {
+                  await notifier.loadMore();
+                  if (context.mounted) setState(() {});
+                },
+              );
+            },
+          ),
           const SizedBox(height: 24),
         ],
       ),
@@ -248,7 +251,9 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
       iconData = Icons.public_outlined;
     }
 
-    final formattedDate = DateFormat('MMM dd, yyyy').format(item.dueDate);
+    final formattedDate = item.dueDisplay.isNotEmpty
+        ? item.dueDisplay
+        : DateFormat('MMM dd, yyyy').format(item.dueDate);
 
     return Material(
       color: Colors.white,
@@ -422,7 +427,9 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
 
   void _showHomeworkDetailModal(BuildContext context, HomeworkModel item, bool isParent) {
     final formattedAssigned = DateFormat('MMM dd, yyyy').format(item.assignedDate);
-    final formattedDue = DateFormat('MMM dd, yyyy').format(item.dueDate);
+    final formattedDue = item.dueDisplay.isNotEmpty
+        ? item.dueDisplay
+        : DateFormat('MMM dd, yyyy').format(item.dueDate);
 
     showModalBottomSheet(
       context: context,
@@ -512,7 +519,7 @@ class _HomeworkListScreenState extends ConsumerState<HomeworkListScreen> {
                     const Divider(height: 16, color: AppColors.border),
                     InfoRow(icon: Icons.event_available, label: 'Assigned Date', value: formattedAssigned, valueFontSize: 12, spacing: 8),
                     const Divider(height: 16, color: AppColors.border),
-                    InfoRow(icon: Icons.event_busy, label: 'Due Date', value: formattedDue, valueFontSize: 12, spacing: 8),
+                    InfoRow(icon: Icons.event_busy, label: 'Due', value: formattedDue, valueFontSize: 12, spacing: 8),
                   ],
                 ),
               ),

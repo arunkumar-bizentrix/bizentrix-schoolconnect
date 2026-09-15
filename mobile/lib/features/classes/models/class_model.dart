@@ -8,6 +8,11 @@ class ClassModel {
   final String displayName;
   final String teacherName;
   final int studentCount;
+  final List<int> teacherIds;
+
+  /// The one teacher who takes this class's daily attendance.
+  final int? classTeacherId;
+  final String? classTeacherName;
   final bool isActive;
 
   const ClassModel({
@@ -18,6 +23,9 @@ class ClassModel {
     required this.displayName,
     this.teacherName = 'Not Assigned',
     this.studentCount = 0,
+    this.teacherIds = const [],
+    this.classTeacherId,
+    this.classTeacherName,
     this.isActive = true,
   });
 
@@ -39,6 +47,14 @@ class ClassModel {
         ? json['student_count'] as int
         : int.tryParse(json['student_count']?.toString() ?? '0') ?? 0;
 
+    final rawTeachers = json['teachers'];
+    final teacherIds = rawTeachers is List
+        ? rawTeachers
+            .map((t) => t is int ? t : int.tryParse(t.toString()) ?? 0)
+            .where((t) => t > 0)
+            .toList()
+        : <int>[];
+
     return ClassModel(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       name: nameStr,
@@ -47,6 +63,11 @@ class ClassModel {
       displayName: display,
       teacherName: teacher,
       studentCount: count,
+      teacherIds: teacherIds,
+      classTeacherId: json['class_teacher'] is int
+          ? json['class_teacher'] as int
+          : int.tryParse(json['class_teacher']?.toString() ?? ''),
+      classTeacherName: json['class_teacher_name']?.toString(),
       isActive: json['is_active'] ?? true,
     );
   }
@@ -58,6 +79,8 @@ class ClassModel {
       'section': section,
       'academic_year': academicYear,
       'display_name': displayName,
+      'teachers': teacherIds,
+      'class_teacher': classTeacherId,
       'is_active': isActive,
     };
   }

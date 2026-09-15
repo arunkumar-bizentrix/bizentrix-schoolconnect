@@ -4,8 +4,22 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Push notifications need google-services.json from the Firebase console.
+// Applying the plugin without that file fails the build outright, so it is
+// applied only when the file is there: the app builds and runs either way,
+// and push simply stays off until Firebase is configured.
+val googleServicesFile = file("google-services.json")
+if (googleServicesFile.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    logger.lifecycle("Firebase: google-services.json found, push enabled.")
+} else {
+    logger.lifecycle(
+        "Firebase: no google-services.json in android/app/ - building without push."
+    )
+}
+
 android {
-    namespace = "com.example.school_connect"
+    namespace = "com.bizentrix.schoolconnect"
     compileSdk = flutter.compileSdkVersion
     buildToolsVersion = "36.0.0"
     ndkVersion = "28.2.13676358"
@@ -17,7 +31,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.school_connect"
+        applicationId = "com.bizentrix.schoolconnect"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

@@ -1,4 +1,4 @@
-package com.example.school_connect
+package com.bizentrix.schoolconnect
 
 import io.flutter.embedding.android.FlutterActivity
 

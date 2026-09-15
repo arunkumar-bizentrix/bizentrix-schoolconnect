@@ -57,6 +57,19 @@ class Class(models.Model):
         limit_choices_to={'role': 'TEACHER'},
         help_text="Teachers assigned to this class",
     )
+    class_teacher = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='homeroom_classes',
+        limit_choices_to={'role': 'TEACHER'},
+        help_text=(
+            "The one teacher responsible for this class: takes the daily "
+            "attendance and is the parents' first contact. Always also one of "
+            "the class's teachers."
+        ),
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -84,6 +97,23 @@ class Class(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.section} ({self.academic_year})"
+
+    def can_mark_attendance(self, user):
+        """
+        Attendance is taken once a day, so one person owns it.
+
+        Admins always may. When a class teacher is set, only they may -
+        otherwise five subject teachers could each mark the same morning
+        differently. Classes without one fall back to any assigned teacher,
+        so nothing that worked before the class teacher existed stops working.
+        """
+        if user.is_superuser or user.role == 'ADMIN':
+            return True
+        if user.role != 'TEACHER':
+            return False
+        if self.class_teacher_id:
+            return self.class_teacher_id == user.id
+        return self.teachers.filter(id=user.id).exists()
 
 
 class Student(models.Model):

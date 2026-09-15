@@ -12,6 +12,7 @@ class HomeworkSerializer(serializers.ModelSerializer):
     student_name = serializers.SerializerMethodField()
     assigned_by_name = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
+    due_display = serializers.CharField(read_only=True)
     is_active = serializers.BooleanField(default=True, required=False)
 
     class Meta:
@@ -32,6 +33,8 @@ class HomeworkSerializer(serializers.ModelSerializer):
             'assigned_by_name',
             'assigned_date',
             'due_date',
+            'due_time',
+            'due_display',
             'attachment',
             'attachment_url',
             'is_active',
@@ -77,16 +80,23 @@ class HomeworkSerializer(serializers.ModelSerializer):
         """
         Validate:
         1. due_date cannot be in the past (must be today or future).
-        2. due_date cannot be earlier than assigned_date.
-        3. If student is specified, student must belong to the selected class.
+        2. A due_time on today's date cannot already have passed.
+        3. due_date cannot be earlier than assigned_date.
+        4. If student is specified, student must belong to the selected class.
         """
         today = timezone.localdate()
         assigned_date = attrs.get('assigned_date', today)
         due_date = attrs.get('due_date')
+        due_time = attrs.get('due_time', getattr(self.instance, 'due_time', None))
 
         if due_date and due_date < today:
             raise serializers.ValidationError({
                 'due_date': 'Due date cannot be in the past. Please select today or a future date.'
+            })
+
+        if due_date == today and due_time and due_time <= timezone.localtime().time():
+            raise serializers.ValidationError({
+                'due_time': 'That time has already passed today. Pick a later time or a later date.'
             })
 
         if due_date and assigned_date and due_date < assigned_date:

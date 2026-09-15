@@ -40,6 +40,14 @@ class Homework(models.Model):
     )
     assigned_date = models.DateField(default=timezone.localdate)
     due_date = models.DateField()
+    due_time = models.TimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Optional deadline time on the due date, e.g. 16:00. Left blank "
+            "the homework is simply due that day."
+        ),
+    )
     attachment = models.FileField(
         upload_to='homework_attachments/',
         null=True,
@@ -84,6 +92,14 @@ class Homework(models.Model):
         if self.classroom and not self.school_id:
             self.school = self.classroom.school
         super().save(*args, **kwargs)
+
+    @property
+    def due_display(self):
+        """Due date, with the time appended when the teacher set one."""
+        formatted = self.due_date.strftime('%d %b %Y')
+        if self.due_time:
+            return f"{formatted}, {self.due_time.strftime('%I:%M %p').lstrip('0')}"
+        return formatted
 
     def __str__(self):
         return f"{self.subject}: {self.title} ({self.classroom})"

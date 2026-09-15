@@ -15,6 +15,7 @@ class ClassSerializer(serializers.ModelSerializer):
     school_code = serializers.CharField(source='school.code', read_only=True)
     display_name = serializers.SerializerMethodField()
     teacher_names = serializers.SerializerMethodField()
+    class_teacher_name = serializers.SerializerMethodField()
     student_count = serializers.SerializerMethodField()
     is_active = serializers.BooleanField(default=True, required=False)
 
@@ -30,6 +31,8 @@ class ClassSerializer(serializers.ModelSerializer):
             'academic_year',
             'teachers',
             'teacher_names',
+            'class_teacher',
+            'class_teacher_name',
             'display_name',
             'student_count',
             'is_active',
@@ -58,12 +61,60 @@ class ClassSerializer(serializers.ModelSerializer):
             for t in obj.teachers.all()
         ]
 
+    def get_class_teacher_name(self, obj):
+        teacher = obj.class_teacher
+        if teacher is None:
+            return None
+        return f"{teacher.first_name} {teacher.last_name}".strip() or teacher.username
+
     def validate_academic_year(self, value):
         if value:
             norm = normalize_academic_year(value)
             validate_academic_year_format(norm)
             return norm
         return value
+
+    def validate_class_teacher(self, value):
+        if value is None:
+            return value
+        if value.role != 'TEACHER':
+            raise serializers.ValidationError(
+                f"User '{value.username}' does not have the TEACHER role."
+            )
+        request = self.context.get('request')
+        if request and not request.user.is_superuser:
+            if value.school_id != get_school_id_for(request.user):
+                raise serializers.ValidationError(
+                    "Cannot assign a teacher from another school."
+                )
+        return value
+
+    def _keep_class_teacher_among_teachers(self, instance):
+        # The class teacher teaches the class too; without this they would
+        # own its attendance yet not see it in their class list.
+        if instance.class_teacher_id and not instance.teachers.filter(
+            id=instance.class_teacher_id
+        ).exists():
+            instance.teachers.add(instance.class_teacher)
+
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        self._keep_class_teacher_among_teachers(instance)
+        return instance
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        # Removing someone from the teachers also removes them as class teacher.
+        if (
+            'teachers' in validated_data
+            and instance.class_teacher_id
+            and 'class_teacher' not in validated_data
+            and instance.class_teacher not in validated_data['teachers']
+        ):
+            instance.class_teacher = None
+            instance.save(update_fields=['class_teacher'])
+        self._keep_class_teacher_among_teachers(instance)
+        return instance
 
     def validate_teachers(self, value):
         request = self.context.get('request')

@@ -5,6 +5,7 @@ class NotificationModel {
   final String message;
   final int? homeworkId;
   final int? announcementId;
+  final int? attendanceId;
   final int? targetId;
   final bool isRead;
   final DateTime createdAt;
@@ -16,6 +17,7 @@ class NotificationModel {
     required this.message,
     this.homeworkId,
     this.announcementId,
+    this.attendanceId,
     this.targetId,
     this.isRead = false,
     required this.createdAt,
@@ -23,6 +25,11 @@ class NotificationModel {
 
   bool get isHomework => notificationType == 'HOMEWORK';
   bool get isAnnouncement => notificationType == 'ANNOUNCEMENT';
+  bool get isAttendance => notificationType == 'ATTENDANCE';
+
+  /// Attendance notices about an absence are the ones a parent must not miss.
+  bool get isAbsence =>
+      isAttendance && title.toLowerCase().contains('absent');
 
   NotificationModel copyWith({
     int? id,
@@ -31,6 +38,7 @@ class NotificationModel {
     String? message,
     int? homeworkId,
     int? announcementId,
+    int? attendanceId,
     int? targetId,
     bool? isRead,
     DateTime? createdAt,
@@ -42,6 +50,7 @@ class NotificationModel {
       message: message ?? this.message,
       homeworkId: homeworkId ?? this.homeworkId,
       announcementId: announcementId ?? this.announcementId,
+      attendanceId: attendanceId ?? this.attendanceId,
       targetId: targetId ?? this.targetId,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
@@ -56,6 +65,7 @@ class NotificationModel {
       message: json['message'] as String? ?? '',
       homeworkId: json['homework'] as int?,
       announcementId: json['announcement'] as int?,
+      attendanceId: json['attendance'] as int?,
       targetId: json['target_id'] as int?,
       isRead: json['is_read'] as bool? ?? false,
       createdAt: json['created_at'] != null
@@ -72,6 +82,7 @@ class NotificationModel {
       'message': message,
       'homework': homeworkId,
       'announcement': announcementId,
+      'attendance': attendanceId,
       'target_id': targetId,
       'is_read': isRead,
       'created_at': createdAt.toIso8601String(),

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../exams/screens/exams_screen.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../announcements/providers/announcements_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../classes/providers/classes_provider.dart';
 import '../../homework/providers/homework_provider.dart';
 import '../../students/providers/students_provider.dart';
+import '../../attendance/screens/mark_attendance_screen.dart';
+import '../../timetable/screens/timetable_screen.dart';
 import '../../homework/screens/create_homework_screen.dart';
 import '../../students/screens/students_screen.dart';
 import '../screens/main_nav_scaffold.dart';
@@ -152,6 +155,124 @@ class TeacherDashboardScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 22),
 
+          // Attendance is the first thing a teacher does each morning, so it
+          // gets its own card rather than hiding among the quick actions.
+          InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MarkAttendanceScreen()),
+            ),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: const Icon(Icons.how_to_reg_rounded,
+                        color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 13),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Mark today's attendance",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'One tap for the whole class',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, color: Color(0xFFC3D7FB)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded,
+                      color: Colors.white70, size: 15),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TimetableScreen.forTeacher()),
+            ),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.statClassesBg,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.schedule_rounded,
+                        color: AppColors.statClassesText, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'My timetable',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Which class and subject, period by period',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 11.5, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded,
+                      color: AppColors.textMuted, size: 14),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 22),
+
           // Quick Actions Section
           const Text(
             'Quick Actions',
@@ -193,6 +314,18 @@ class TeacherDashboardScreen extends ConsumerWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          _buildQuickActionButton(
+            context: context,
+            label: 'Enter Exam Marks',
+            icon: Icons.fact_check_outlined,
+            bgColor: const Color(0xFFFDF4FF),
+            textColor: AppColors.statAnnouncementsText,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ExamsScreen()),
+            ),
           ),
           const SizedBox(height: 10),
           Row(
@@ -242,12 +375,16 @@ class TeacherDashboardScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Recent Announcements',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              const Expanded(
+                child: Text(
+                  'Recent Announcements',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
               GestureDetector(
@@ -427,7 +564,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Due: ${recentHw.dueDate.day}/${recentHw.dueDate.month}/${recentHw.dueDate.year}',
+                            'Due: ${recentHw.dueDisplay.isNotEmpty ? recentHw.dueDisplay : '${recentHw.dueDate.day}/${recentHw.dueDate.month}/${recentHw.dueDate.year}'}',
                             style: const TextStyle(
                               fontSize: 11,
                               color: AppColors.textMuted,

@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 13+ will not show a notification until the user grants this. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="school_connect"
         android:name="${applicationName}"
@@ -32,6 +34,13 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- The channel the backend addresses its pushes to. Declaring it here
+             lets Firebase create it on first launch, so homework and
+             attendance alerts arrive with sound instead of silently on the
+             system default channel. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="schoolconnect_default" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -393,3 +393,86 @@ class HomeworkAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('due_date', response.data)
+
+
+class HomeworkDueTimeTests(APITestCase):
+    """
+    A teacher can put a clock time on the deadline ("submit by 4 PM"), not just
+    a date. The time is optional: homework that is simply due that day leaves
+    it blank, and every existing row predates the field.
+    """
+
+    def setUp(self):
+        self.school = School.objects.create(name="Due Time School", code="DUE01")
+        self.teacher = User.objects.create_user(
+            username='due_teacher', password='Password@123',
+            role=User.Role.TEACHER, school=self.school,
+        )
+        self.classroom = Class.objects.create(
+            school=self.school, name='Grade 5', section='A',
+            academic_year='2026-2027',
+        )
+        self.classroom.teachers.add(self.teacher)
+        self.client.force_authenticate(user=self.teacher)
+
+    def _payload(self, **overrides):
+        payload = {
+            'classroom': self.classroom.id,
+            'subject': 'Mathematics',
+            'title': 'Fractions worksheet',
+            'due_date': str(date.today() + timedelta(days=2)),
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_homework_can_be_created_with_a_due_time(self):
+        res = self.client.post('/api/v1/homework/', self._payload(due_time='16:00'), format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data['due_time'], '16:00:00')
+        self.assertIn('4:00 PM', res.data['due_display'])
+
+    def test_due_time_is_optional(self):
+        res = self.client.post('/api/v1/homework/', self._payload(), format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(res.data['due_time'])
+        # No time set: the display is just the date, with no stray comma.
+        self.assertNotIn(',', res.data['due_display'])
+
+    def test_a_time_that_already_passed_today_is_rejected(self):
+        res = self.client.post(
+            '/api/v1/homework/',
+            self._payload(due_date=str(date.today()), due_time='00:01'),
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('due_time', res.data)
+
+    def test_a_later_time_today_is_accepted(self):
+        res = self.client.post(
+            '/api/v1/homework/',
+            self._payload(due_date=str(date.today()), due_time='23:59'),
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_parent_notification_mentions_the_time(self):
+        student = Student.objects.create(
+            school=self.school, admission_number='DUE-001',
+            first_name='Kavya', last_name='S', class_enrolled=self.classroom,
+        )
+        parent = User.objects.create_user(
+            username='due_parent', password='Password@123',
+            role=User.Role.PARENT, school=self.school,
+        )
+        student.parents.add(parent)
+
+        res = self.client.post('/api/v1/homework/', self._payload(due_time='16:00'), format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        notification = parent.notifications.first()
+        self.assertIsNotNone(notification)
+        self.assertIn('4:00 PM', notification.message)

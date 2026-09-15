@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../shared/widgets/screen_header.dart';
+import '../../../shared/widgets/load_more_footer.dart';
 import '../../../core/utils/role_access.dart';
 import '../providers/announcements_provider.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -31,49 +33,26 @@ class _AnnouncementsListScreenState extends ConsumerState<AnnouncementsListScree
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row: Title & Subtitle + Add Announcement Button (hidden for Parents)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Announcements',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.5,
-                      ),
+          // Header: title + action. ScreenHeader stacks the button under the
+          // title on narrow widths so the heading never collapses to one
+          // letter per line.
+          ScreenHeader(
+            title: 'Announcements',
+            subtitle: 'School circulars and notices',
+            action: isParent
+                ? null
+                : ElevatedButton.icon(
+                    onPressed: () => _showAddAnnouncementDialog(context),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('New Notice', style: TextStyle(fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
                     ),
-                    SizedBox(height: 4),
-                    Text(
-                      'School circulars and notices',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!isParent)
-                ElevatedButton.icon(
-                  onPressed: () => _showAddAnnouncementDialog(context),
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add Announcement', style: TextStyle(fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    elevation: 0,
                   ),
-                ),
-            ],
           ),
           const SizedBox(height: 16),
 
@@ -169,6 +148,25 @@ class _AnnouncementsListScreenState extends ConsumerState<AnnouncementsListScree
                 ),
               ),
             ),
+          ),
+
+          // Paged list: the API returns 20 at a time, so the full set is only
+          // reachable through this.
+          Builder(
+            builder: (context) {
+              final notifier = ref.read(announcementsProvider.notifier);
+              return LoadMoreFooter(
+                loadedCount: announcementsAsync.value?.length ?? 0,
+                totalCount: notifier.totalCount,
+                hasMore: notifier.hasMore,
+                isLoading: notifier.isLoadingMore,
+                noun: 'notices',
+                onLoadMore: () async {
+                  await notifier.loadMore();
+                  if (context.mounted) setState(() {});
+                },
+              );
+            },
           ),
           const SizedBox(height: 24),
         ],

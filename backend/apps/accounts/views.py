@@ -1,14 +1,30 @@
 import logging
+
+from django.db.models import Q
 from rest_framework import status, permissions, parsers
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .models import OTPVerification
-from .services import WhatsAppService, EmailService
+from apps.notifications.models import DeviceToken
+from apps.schools.services import get_school_for
+
+from .models import OTPVerification, User
+from .services import (
+    AccountError,
+    EmailService,
+    WhatsAppService,
+    create_school_account,
+    reset_temporary_password,
+)
+from .services.accounts import MANAGED_ROLES, normalize_phone, split_name
 from .serializers import (
     LoginSerializer,
+    StaffCreateSerializer,
+    StaffSummarySerializer,
+    StaffUpdateSerializer,
     UserSerializer,
     SendOTPSerializer,
     VerifyOTPSerializer,
@@ -215,6 +231,205 @@ class VerifyOTPView(APIView):
         serializer = VerifyOTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+
+def _is_school_admin(user):
+    return user.is_authenticated and (user.role == User.Role.ADMIN or user.is_superuser)
+
+
+def _forbidden_unless_admin(user):
+    if _is_school_admin(user):
+        return None
+    return Response(
+        {"detail": "Only school administrators can manage teacher and parent accounts."},
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def _people_queryset(user):
+    """Teacher and parent accounts this admin manages."""
+    queryset = User.objects.filter(role__in=MANAGED_ROLES)
+    if not (user.is_superuser and not user.school):
+        queryset = queryset.filter(school=get_school_for(user))
+    return queryset
+
+
+def _with_linked(queryset, role):
+    related = 'assigned_classes' if role == User.Role.TEACHER else 'children'
+    return queryset.prefetch_related(related)
+
+
+class SchoolStaffListView(APIView):
+    """
+    GET  /api/v1/auth/staff/?role=TEACHER
+        The school's teachers or parents. Backs both the admin's People screen
+        and the pickers (assigning a teacher to a class, linking a parent).
+        ?search= matches name, phone, email or username.
+        ?include_inactive=1 also lists deactivated accounts.
+        ?page=N switches to a paginated envelope - a school has a thousand
+        parents, and the People screen should not pull all of them at once.
+
+    POST /api/v1/auth/staff/
+        Creates a teacher or parent account and returns a one-time password
+        for the admin to hand over. Teachers cannot sign themselves up.
+
+    Admin only: ordinary users have no reason to enumerate or create accounts.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    page_size = 30
+
+    def get(self, request):
+        denied = _forbidden_unless_admin(request.user)
+        if denied:
+            return denied
+
+        role = (request.query_params.get('role') or User.Role.TEACHER).upper()
+        if role not in MANAGED_ROLES:
+            return Response(
+                {"detail": "role must be TEACHER or PARENT."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        queryset = _people_queryset(request.user).filter(role=role)
+        if request.query_params.get('include_inactive') not in ('1', 'true', 'True'):
+            queryset = queryset.filter(is_active=True)
+
+        search = (request.query_params.get('search') or '').strip()
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search)
+                | Q(last_name__icontains=search)
+                | Q(email__icontains=search)
+                | Q(phone_number__icontains=search)
+                | Q(username__icontains=search)
+            )
+
+        queryset = _with_linked(queryset, role).order_by(
+            '-is_active', 'first_name', 'last_name', 'username'
+        )
+
+        if 'page' not in request.query_params:
+            return Response(StaffSummarySerializer(queryset, many=True).data)
+
+        paginator = PageNumberPagination()
+        paginator.page_size = self.page_size
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        return paginator.get_paginated_response(
+            StaffSummarySerializer(page, many=True).data
+        )
+
+    def post(self, request):
+        denied = _forbidden_unless_admin(request.user)
+        if denied:
+            return denied
+
+        serializer = StaffCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            user, temporary_password = create_school_account(
+                school=get_school_for(request.user),
+                role=data['role'],
+                full_name=data['full_name'],
+                phone_number=data['phone_number'],
+                email=data.get('email', ''),
+            )
+        except AccountError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info("Admin %s created %s account %s", request.user.pk, user.role, user.pk)
+        return Response(
+            {
+                'account': StaffSummarySerializer(user).data,
+                'temporary_password': temporary_password,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class SchoolStaffDetailView(APIView):
+    """
+    PATCH /api/v1/auth/staff/<id>/
+    Edit a teacher or parent: name, phone, email, or deactivate them.
+
+    Accounts are deactivated rather than deleted. A teacher who leaves still
+    owns the homework and attendance they recorded, and that history must
+    survive them.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        denied = _forbidden_unless_admin(request.user)
+        if denied:
+            return denied
+
+        person = _people_queryset(request.user).filter(pk=pk).first()
+        if person is None:
+            return Response({"detail": "Account not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = StaffUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        if 'phone_number' in data:
+            phone = normalize_phone(data['phone_number'])
+            if len(phone) != 10:
+                return Response(
+                    {"detail": "Enter a 10-digit mobile number."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            clash = User.objects.filter(role=person.role, phone_number=phone).exclude(pk=person.pk)
+            if clash.exists():
+                return Response(
+                    {"detail": "Another %s already uses %s." % (person.role.lower(), phone)},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            person.phone_number = phone
+
+        if 'email' in data:
+            email = (data['email'] or '').strip().lower()
+            if email and User.objects.filter(email__iexact=email).exclude(pk=person.pk).exists():
+                return Response(
+                    {"detail": "Another account already uses %s." % email},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            person.email = email
+
+        if 'full_name' in data:
+            person.first_name, person.last_name = split_name(data['full_name'])
+
+        if 'is_active' in data:
+            person.is_active = data['is_active']
+
+        person.save()
+        if 'is_active' in data and not person.is_active:
+            # A deactivated account must stop receiving pushes at once.
+            DeviceToken.objects.filter(user=person).delete()
+
+        person = _with_linked(User.objects, person.role).get(pk=person.pk)
+        return Response(StaffSummarySerializer(person).data)
+
+
+class StaffResetPasswordView(APIView):
+    """
+    POST /api/v1/auth/staff/<id>/reset-password/
+    A teacher or parent forgot their password: issue a new one-time password.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        denied = _forbidden_unless_admin(request.user)
+        if denied:
+            return denied
+
+        person = _people_queryset(request.user).filter(pk=pk).first()
+        if person is None:
+            return Response({"detail": "Account not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        temporary_password = reset_temporary_password(person)
+        logger.info("Admin %s reset the password of account %s", request.user.pk, person.pk)
+        return Response({'temporary_password': temporary_password})
 
 
 class RegisterView(APIView):

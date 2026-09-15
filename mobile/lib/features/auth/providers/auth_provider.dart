@@ -7,6 +7,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/push/push_service.dart';
 import '../../../core/storage/token_storage.dart';
 import '../models/user_model.dart';
 
@@ -36,7 +37,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient apiClient;
   final TokenStorage tokenStorage;
 
-  AuthNotifier({required this.apiClient, required this.tokenStorage})
+  /// Only used to reach the push service on sign-in and sign-out. Optional so
+  /// that tests can build a notifier without a container.
+  final Ref? ref;
+
+  AuthNotifier({required this.apiClient, required this.tokenStorage, this.ref})
       : super(const AuthState()) {
     restoreSession();
   }
@@ -65,6 +70,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await tokenStorage.saveUserRole(user.role);
         await tokenStorage.saveUserProfileJson(jsonEncode(response.data));
         state = AuthState(user: user);
+        _registerForPush();
         return true;
       }
     } catch (e) {
@@ -118,6 +124,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await tokenStorage.saveUserProfileJson(jsonEncode(profileRes.data));
 
       state = AuthState(user: user);
+      _registerForPush();
       return true;
     } catch (e) {
       final failure = apiClient.handleError(e);
@@ -187,6 +194,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await tokenStorage.saveUserProfileJson(jsonEncode(user.toJson()));
 
       state = AuthState(user: user);
+      _registerForPush();
       return true;
     } catch (e) {
       final failure = apiClient.handleError(e);
@@ -266,6 +274,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await tokenStorage.saveUserProfileJson(jsonEncode(user.toJson()));
 
       state = AuthState(user: user);
+      _registerForPush();
       return true;
     } catch (e) {
       final failure = apiClient.handleError(e);
@@ -356,14 +365,89 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Registers a new teacher or parent and signs them straight in.
+  /// Returns null on success, or the server's message on failure.
+  Future<String?> register({
+    required String fullName,
+    required String password,
+    required String role,
+    String? email,
+    String? phoneNumber,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final response = await apiClient.dio.post(
+        ApiEndpoints.authRegister,
+        data: {
+          'full_name': fullName,
+          'password': password,
+          'role': role.toUpperCase(),
+          if (email != null && email.isNotEmpty) 'email': email.trim().toLowerCase(),
+          if (phoneNumber != null && phoneNumber.isNotEmpty) 'phone_number': phoneNumber,
+        },
+      );
+
+      final data = response.data;
+      final accessToken = data['access']?.toString();
+      final refreshToken = data['refresh']?.toString();
+
+      if (accessToken == null || accessToken.isEmpty) {
+        state = state.copyWith(isLoading: false);
+        return 'Registration succeeded but no session was returned. Please sign in.';
+      }
+
+      await tokenStorage.saveTokens(
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      );
+
+      UserModel user;
+      if (data['user'] is Map<String, dynamic>) {
+        user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
+      } else {
+        final profileRes = await apiClient.dio.get(
+          ApiEndpoints.userProfile,
+          options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        );
+        user = UserModel.fromJson(profileRes.data);
+      }
+
+      await tokenStorage.saveUserRole(user.role);
+      await tokenStorage.saveUserProfileJson(jsonEncode(user.toJson()));
+
+      state = AuthState(user: user);
+      _registerForPush();
+      return null;
+    } catch (e) {
+      final failure = apiClient.handleError(e);
+      state = AuthState(errorMessage: failure.message);
+      return failure.message;
+    }
+  }
+
   Future<void> logout() async {
+    // Hand the device back before the token goes: the DELETE needs this
+    // user's credentials, and whoever signs in next on this phone must not
+    // keep receiving the previous account's notifications.
+    await _push?.unregisterDevice();
+
     await tokenStorage.clearAll();
     state = const AuthState();
+  }
+
+  PushService? get _push => ref?.read(pushServiceProvider);
+
+  /// Tells the backend which device this account is now signed in on.
+  ///
+  /// Fire-and-forget on purpose - a phone that refuses notification
+  /// permission must still get all the way into the app.
+  void _registerForPush() {
+    _push?.registerDevice();
   }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   final tokenStorage = ref.watch(tokenStorageProvider);
-  return AuthNotifier(apiClient: apiClient, tokenStorage: tokenStorage);
+  return AuthNotifier(apiClient: apiClient, tokenStorage: tokenStorage, ref: ref);
 });

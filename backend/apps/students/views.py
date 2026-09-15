@@ -1,5 +1,6 @@
 from django.db.models import Count, Q
-from rest_framework import viewsets, permissions, filters, status
+from django.http import HttpResponse
+from rest_framework import viewsets, permissions, filters, status, parsers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.views import APIView
@@ -15,6 +16,7 @@ from .serializers import (
     StudentClassEnrollmentSerializer,
 )
 from .permissions import IsSchoolMember
+from .services import ImportError_, build_template_csv, import_students_csv
 
 
 class ClassViewSet(viewsets.ModelViewSet):
@@ -33,7 +35,7 @@ class ClassViewSet(viewsets.ModelViewSet):
         user = self.request.user
         school = get_school_for(user)
 
-        queryset = Class.objects.select_related('school').prefetch_related('teachers').annotate(
+        queryset = Class.objects.select_related('school', 'class_teacher').prefetch_related('teachers').annotate(
             student_count=Count('students', filter=Q(students__is_active=True), distinct=True),
         )
         if not (user.is_superuser and not user.school):
@@ -353,3 +355,86 @@ class ParentChildrenView(APIView):
         ]
         return Response(data, status=status.HTTP_200_OK)
 
+
+
+class StudentImportView(APIView):
+    """
+    POST /api/v1/students/import/    multipart: file=<roll.csv>[&dry_run=true]
+    GET  /api/v1/students/import/    downloads the CSV template
+
+    Bulk-onboards a school roll: creates the classes and students named in the
+    file, creates a parent account per phone number, and links them. Admin
+    only - this writes across the whole roll.
+
+    Pass dry_run=true to validate a file and see the summary without keeping
+    any of it.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+
+    MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+
+    def _reject_non_admin(self, request):
+        if request.user.role != User.Role.ADMIN and not request.user.is_superuser:
+            return Response(
+                {"detail": "Only school administrators can import the student roll."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return None
+
+    def get(self, request):
+        denied = self._reject_non_admin(request)
+        if denied:
+            return denied
+
+        response = HttpResponse(build_template_csv(), content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="student_roll_template.csv"'
+        return response
+
+    def post(self, request):
+        denied = self._reject_non_admin(request)
+        if denied:
+            return denied
+
+        upload = request.FILES.get('file')
+        if upload is None:
+            return Response(
+                {"detail": "Attach the roll as a CSV file in the 'file' field."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if upload.size > self.MAX_UPLOAD_BYTES:
+            return Response(
+                {"detail": "That file is larger than 5 MB. Split it into smaller files."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        raw = str(request.data.get('dry_run', '')).lower()
+        dry_run = raw in ('1', 'true', 'yes')
+
+        academic_year = (
+            request.data.get('academic_year')
+            or normalize_academic_year(request.query_params.get('academic_year', ''))
+            or None
+        )
+        if not academic_year:
+            from django.utils import timezone
+            today = timezone.localdate()
+            start = today.year if today.month >= 6 else today.year - 1
+            academic_year = f'{start}-{start + 1}'
+
+        school = attach_user_to_school(request.user)
+        if school is None:
+            return Response(
+                {"detail": "No school is set up yet."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            summary = import_students_csv(
+                upload.read(), school, academic_year, dry_run=dry_run
+            )
+        except ImportError_ as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        summary['academic_year'] = academic_year
+        return Response(summary, status=status.HTTP_200_OK)

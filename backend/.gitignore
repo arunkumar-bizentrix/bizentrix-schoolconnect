@@ -22,3 +22,7 @@ staticfiles/
 
 # Logs
 *.log
+
+# Firebase service-account key - contains a private key, never commit
+firebase-service-account.json
+firebase-*.json

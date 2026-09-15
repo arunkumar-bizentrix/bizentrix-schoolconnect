@@ -9,6 +9,7 @@ class StudentModel {
   final int? classId;
   final String className;
   final String academicYear;
+  final List<int> parentIds;
   final bool isActive;
 
   const StudentModel({
@@ -20,6 +21,7 @@ class StudentModel {
     this.classId,
     required this.className,
     this.academicYear = AppConstants.currentAcademicYear,
+    this.parentIds = const [],
     this.isActive = true,
   });
 
@@ -37,6 +39,14 @@ class StudentModel {
       cId = int.tryParse(json['class_enrolled'].toString());
     }
 
+    final rawParents = json['parents'];
+    final parentIds = rawParents is List
+        ? rawParents
+            .map((p) => p is int ? p : int.tryParse(p.toString()) ?? 0)
+            .where((p) => p > 0)
+            .toList()
+        : <int>[];
+
     return StudentModel(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       admissionNumber: json['admission_number'] ?? 'ADM000',
@@ -46,6 +56,7 @@ class StudentModel {
       classId: cId,
       className: json['class_name'] ?? json['class_enrolled_name'] ?? 'Class',
       academicYear: json['academic_year'] ?? AppConstants.currentAcademicYear,
+      parentIds: parentIds,
       isActive: json['is_active'] ?? true,
     );
   }
@@ -60,6 +71,7 @@ class StudentModel {
       'class_enrolled': classId,
       'class_name': className,
       'academic_year': academicYear,
+      'parents': parentIds,
       'is_active': isActive,
     };
   }
