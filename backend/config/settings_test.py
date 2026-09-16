@@ -25,10 +25,6 @@ PASSWORD_HASHERS = [
 # Individual tests still override these when they need to assert on a specific
 # delivery mode.
 # ---------------------------------------------------------------------------
-EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
-EMAIL_HOST = 'localhost'
-EMAIL_HOST_USER = 'test@schoolconnect.test'
-EMAIL_HOST_PASSWORD = 'test-password-not-real'
 DEFAULT_FROM_EMAIL = 'test@schoolconnect.test'
 
 WHATSAPP_ACCESS_TOKEN = None

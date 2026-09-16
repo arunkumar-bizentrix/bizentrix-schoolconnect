@@ -5,8 +5,6 @@ from .views import (
     UserProfileView,
     SendOTPView,
     VerifyOTPView,
-    SendEmailOTPView,
-    VerifyEmailOTPView,
     SchoolStaffDetailView,
     SchoolStaffListView,
     StaffResetPasswordView,
@@ -26,11 +24,7 @@ urlpatterns = [
         name='auth_staff_reset_password',
     ),
     
-    # Email OTP Authentication Endpoints
-    path('otp/email/send/', SendEmailOTPView.as_view(), name='auth_otp_email_send'),
-    path('otp/email/verify/', VerifyEmailOTPView.as_view(), name='auth_otp_email_verify'),
-
-    # WhatsApp OTP Authentication Endpoints (Preserved for backwards compatibility)
+    # WhatsApp OTP Authentication Endpoints
     path('otp/send/', SendOTPView.as_view(), name='auth_otp_send'),
     path('otp/verify/', VerifyOTPView.as_view(), name='auth_otp_verify'),
 ]

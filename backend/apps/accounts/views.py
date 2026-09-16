@@ -14,7 +14,6 @@ from apps.schools.services import get_school_for
 from .models import OTPVerification, User
 from .services import (
     AccountError,
-    EmailService,
     WhatsAppService,
     create_school_account,
     reset_temporary_password,
@@ -32,8 +31,6 @@ from .serializers import (
     UserSerializer,
     SendOTPSerializer,
     VerifyOTPSerializer,
-    SendEmailOTPSerializer,
-    VerifyEmailOTPSerializer,
 )
 
 logger = logging.getLogger('schoolconnect.accounts')
@@ -100,83 +97,6 @@ class UserProfileView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class SendEmailOTPView(APIView):
-    """
-    POST /api/v1/auth/otp/email/send/
-    Dispatches a cryptographically secure 6-digit OTP via real SMTP email.
-    
-    Security guarantees:
-    - Never prints OTP to terminal.
-    - Never logs OTP, tokens, or SMTP credentials.
-    - Never returns OTP in the API response.
-    - Safe anti-enumeration response structure.
-    - 60s cooldown and 10 req/hour rate limiting.
-    """
-    permission_classes = [permissions.AllowAny]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = 'otp'
-
-    def post(self, request):
-        serializer = SendEmailOTPSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        email = serializer.validated_data['email']
-        user = serializer.validated_data.get('user')
-        purpose = serializer.validated_data.get('purpose', 'login')
-
-        ip = (
-            request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
-            or request.META.get('REMOTE_ADDR')
-        )
-
-        # Generate OTP record for the destination email. The record is kept
-        # even for unknown/inactive addresses so per-destination rate limits
-        # still apply, but the OTP email is ONLY sent to active users or during registration.
-        record, raw_otp = OTPVerification.generate_otp(
-            destination=email,
-            channel=OTPVerification.Channel.EMAIL,
-            user=user,
-            ip_address=ip,
-            validity_minutes=5,
-            max_attempts=5,
-        )
-
-        if user or purpose == 'register':
-            mail_result = EmailService.send_otp_email(email, raw_otp)
-            if not mail_result.get('success'):
-                logger.error("Failed to send OTP email to recipient.")
-                error_detail = mail_result.get('error') or "Email delivery service is currently not configured on this server."
-                return Response({
-                    'detail': error_detail,
-                }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-        # Generic success regardless of account existence (anti-enumeration):
-        # unknown/inactive addresses get no email but the same response shape.
-        return Response({
-            'success': True,
-            'status': 'success',
-            'detail': f"An OTP has been sent to {email}.",
-            'message': f"An OTP has been sent to {email}.",
-            'email': email,
-            'expires_in_seconds': 300,
-        }, status=status.HTTP_200_OK)
-
-
-class VerifyEmailOTPView(APIView):
-    """
-    POST /api/v1/auth/otp/email/verify/
-    Verifies 6-digit OTP against stored hash and returns SimpleJWT access and refresh tokens.
-    """
-    permission_classes = [permissions.AllowAny]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = 'otp'
-
-    def post(self, request):
-        serializer = VerifyEmailOTPSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
 
 class SendOTPView(APIView):
@@ -488,4 +408,3 @@ class ChangePasswordView(APIView):
             'refresh': str(refresh),
             'user': UserSerializer(user, context={'request': request}).data,
         })
-
